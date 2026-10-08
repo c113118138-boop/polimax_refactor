@@ -115,6 +115,23 @@ class SSOTests(unittest.TestCase):
     def test_changed_identity_rejected(self):
         self.login();path=self.sso.path(self.client.cookies.get(self.sso.cookie),'session');r=self.sso.read(path);r['checked_at']=0;self.sso.write(path,r)
         self.identity='different-id';self.assertEqual(self.client.get('/me').status_code,401)
+    def test_retry_clears_session_and_redirects_through_idp_logout(self):
+        self.login()
+        path=self.sso.path(self.client.cookies.get(self.sso.cookie),'session')
+        response=self.client.get('/api/auth/sso',params={'retry':1,'return_to':'/vehicles'},follow_redirects=False)
+        target=urlsplit(response.headers['location'])
+        self.assertEqual(target.netloc,'idp.test')
+        self.assertEqual(target.path,'/logout')
+        entry=urlsplit(parse_qs(target.query)['redirect_uri'][0])
+        self.assertEqual(entry.netloc,'testserver')
+        self.assertEqual(entry.path,'/api/auth/sso')
+        self.assertEqual(parse_qs(entry.query),{'return_to':['/vehicles']})
+        self.assertFalse(path.exists())
+        self.assertIsNone(self.client.cookies.get(self.sso.cookie))
+        self.assertEqual(response.headers['cache-control'],'no-store')
+        response=self.client.get('/api/auth/sso',params={'retry':1,'return_to':'//evil.test'},follow_redirects=False)
+        entry=parse_qs(urlsplit(response.headers['location']).query)['redirect_uri'][0]
+        self.assertEqual(parse_qs(urlsplit(entry).query)['return_to'],['/'])
     def test_existing_snapshot_boolean_roles(self):
         self.sso.config.pop('AMS_POLICY_FILE')
         payload={'meta':{'version':4},'data':{'users':[{'name':'staff@example.test','full_name':'員工','enabled':True}],
@@ -127,8 +144,34 @@ class SSOTests(unittest.TestCase):
         self.assertEqual(user['permissions']['roles'],['業務'])
         self.assertTrue(user['permissions']['forms']['Lending_form']['submit'])
         self.assertFalse(user['permissions']['forms']['VehicleManagement']['delete'])
+        payload['data']['users'][0]['name']='Staff@Example.Test'
+        payload['data']['userRoles'][0]['user']='Staff@Example.Test'
+        (self.root/'snapshot.json').write_text(json.dumps(payload))
+        user=self.sso.with_permissions({'id':'verified-id','email':'staff@example.test','name':'王小明'})
+        self.assertEqual(user['permissions']['roles'],['業務'])
+        payload['data']['userPermissions']=[{'user':'Staff@Example.Test'}]
+        (self.root/'snapshot.json').write_text(json.dumps(payload))
+        self.assert_zero_access(self.sso.with_permissions({'id':'verified-id','email':'staff@example.test','name':'王小明'}))
+        payload['data']['userPermissions']=[]
         payload['data']['users'][0]['enabled']=False;(self.root/'snapshot.json').write_text(json.dumps(payload))
-        from fastapi import HTTPException
-        with self.assertRaises(HTTPException):self.sso.with_permissions({'id':'verified-id','email':'staff@example.test','name':'王小明'})
+        self.assert_zero_access(self.sso.with_permissions({'id':'verified-id','email':'staff@example.test','name':'王小明'}))
+
+    def assert_zero_access(self,user):
+        self.assertEqual(user['permissions']['roles'],[])
+        self.assertEqual(user['role_label'],'無權限')
+        self.assertFalse(any(v for ops in user['permissions']['forms'].values() for v in ops.values()))
+
+    def test_unknown_sso_account_can_login_without_permissions(self):
+        self.sso.config.pop('AMS_POLICY_FILE')
+        payload={'meta':{'version':5},'data':{'users':[], 'roles':[], 'userRoles':[]}}
+        (self.root/'snapshot.json').write_text(json.dumps(payload))
+        (self.root/'latest.json').write_text(json.dumps({'file':'snapshot.json'}))
+        self.sso.config['AMS_SSO_POLICY_MANIFEST']=str(self.root/'latest.json')
+        self.login()
+        response=self.client.get('/me')
+        self.assertEqual(response.status_code,200,response.text)
+        self.assert_zero_access(response.json())
+        self.assertEqual(response.json()['id'],'verified-id')
+        self.assertEqual(self.client.post('/logout').status_code,200)
 
 if __name__=='__main__':unittest.main(verbosity=2)

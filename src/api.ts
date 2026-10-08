@@ -46,6 +46,7 @@ export type Resource = {
   [key: string]: any;
 };
 export type Booking = {
+  detail_allowed?: boolean;
   id: string;
   kind: string;
   status: string;

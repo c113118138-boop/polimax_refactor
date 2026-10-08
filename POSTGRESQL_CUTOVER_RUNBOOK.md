@@ -1,24 +1,46 @@
-# PostgreSQL 正式切換草案
+# PostgreSQL 搬移、發版與回復手冊
 
-狀態：**2026-09-22 已依本草案完成正式切換。下文保留當時操作順序供回復與下次搬移參考；執行結果見 [遷移紀錄](POSTGRESQL_MIGRATION_BASELINE.md)。**
+> 專案名稱與路徑更新：2026-10-07。專案名稱為 `polimax_refactor`，本機目錄為 `/home/c113118138/polimax_refactor`。
 
-## 切換前必須確認
+更新：2026-10-05。初次MySQL→PostgreSQL切換已完成；本手冊現在處理現行PostgreSQL架構的搬機／升級／回復。MySQL不再是預設回復目標，不能以改模式忽略已寫入的PostgreSQL業務資料。
 
-- 安排停寫窗口；通知使用者期間網站與三個定位接收器暫停。確認有權執行 `sudo`、`polimax_admin` 密碼可在終端機輸入。
-- 再核實是否有其他主機、容器或排程寫 `mqtt_data`。本機常駐寫入者為 `polimax-next@5173/5174` 與三個 `pmx-tracking@...`；`polimax-gps-cleanup.timer` 每日 03:30 會刪除過期資料。舊 `AMS_API.py`／`backup_*.py` 本機未見常駐，但仍是 MySQL 專用程式。
-- 盤點目標 PostgreSQL 備份排程及儲存位置。現有 MySQL 備份 agent 不能當作 PostgreSQL 備份。`pg_dump -Fc`／`pg_restore` 已在隔離叢集演練，正式目標庫與 `.data` 的備份尚未建立。
-- 在正式環境先驗證 SSO、權限快照、附件與定位頁面；測試登入無法替代真實帳號驗收。
+## 1. 操作前確認
 
-## 停寫窗口順序
+- 記錄版本、服務帳號、網站入口、SSO公開網址與callback、正式／封存庫、持久資料路徑及備份位置。
+- 列出所有寫入者：網站、外部PMXAgent MQTT接收器、FindMy匯入、權限更新、封存與其他上游。網站advisory lock不能保證阻止所有外部寫入。
+- 新主機準備PG16/PostGIS、Python/Node、pg_dump/pg_restore、Nginx/systemd及有效SSO配置，先在隔離環境還原演練。
+- 確認備份包含正式庫、啟用封存時的封存庫、JSON、附件、權限、FindMy資料及私密設定；自訂路徑額外核對。參見[搬機清單](deploy/STANDALONE.md)。
 
-1. 停止兩個網站入口與三個接收器，暫停 `polimax-gps-cleanup.timer`；核對沒有其他寫入程序。若權限同步服務會更新 `.data/permissions`，亦暫停它。此時 MySQL 服務本身保持運行，供備份與最後匯出。
-2. 在權限限制為 `0700` 的備份目錄執行 `sudo mysqldump --single-transaction --skip-lock-tables --routines --events --triggers mqtt_data`，保存完整 MySQL SQL；另封存當時的 `polimax_next/.data` 與資料庫設定檔。`--skip-lock-tables` 是因 MySQL view 的舊 definer 已不存在，普通 `mysqldump` 曾報 1449。備份含帳密、session 與業務資料，不得加入 Git。
-3. 驗證 SQL dump 包含 23 張表、3 個 view，封存檔可讀且有雜湊值。做過還原演練後，才把這份備份視為回復依據。
-4. 用 `scripts/export_postgresql.py` 從停寫後的 MySQL 產生**新的** PostgreSQL 匯出；不得沿用 `/tmp/polimax_pg_test_export_20260921b`。在 `polimax_PostgreSQL` 清除舊測試快照後，載入新 `load.psql`，再執行 `scripts/postgresql_views.sql`。
-5. 重新核對每張表筆數、主鍵最大值、三個 view，以及 `.data/responses`、`.data/files`、`.data/permissions` 的檔案數與關聯。`scripts/verify_postgresql.sql` 可作目標庫初步檢查，但不能代替逐表及業務驗收。
-6. **通過核對後**才將 `polimax_next` 的 `AMS_DATABASE_MODE` 設為 `postgresql` 並填入 `POSTGRES_*`，重新啟動網站與三個接收器。確認 `/api/health` 回報 PostgreSQL，SSO 登入、資產、預約、附件、GPS／Beacon 實際接收、GPS 清理唯讀預覽皆正常。
-7. 設定並驗證 PostgreSQL 與 `.data` 的定期一致備份，再恢復清理排程。保留 MySQL 與切換點封存，直到回復期限結束。
+## 2. 一致停寫與備份
 
-## 回復原則
+安排維護窗口後停止實際網站、PMX接收器與FindMy寫入，暫停封存timer及會改權限檔的程序；暫停timer不會停止已執行的oneshot，須確認相關作業已結束。保留PostgreSQL運行。
 
-切換後若已有新表單、附件或定位資料寫入 PostgreSQL，不能只把網站連線改回 MySQL。必須先停寫，決定如何處理切換後新增資料，再一起回復資料庫與 `.data` 到相容狀態。若切換前的備份或核對失敗，維持 MySQL 模式並重新啟動原服務。
+在專案根執行現行備份：
+
+```bash
+.venv/bin/python scripts/backup_postgresql.py
+```
+
+確認輸出BACKUP_COMPLETE、manifest與postgresql.dump、expired.dump（封存啟用時）、persistent.tar。用SHA-256對manifest核對檔案，pg_restore --list檢查dump可讀、tar清單檢查業務子目錄。備份內容含密鑰，不進Git。
+
+## 3. 還原與切換
+
+1. 在目標建立不同名稱的隔離驗證庫／正式與封存庫，啟用PostGIS；從有效dump還原完整schema與資料，不能拿測試schema替代。
+2. 使用`pg_restore --no-owner --no-acl`，密碼透過本機互動或私密PGPASSFILE，不放命令列／文件。已還原PostGIS欄位與trigger時不要重跑add_location.sql。
+3. 還原persistent.tar並確認設定與data路徑指向目標；自訂路徑另行搬入。可不搬sso/session讓使用者重新登入；FindMy須搬session/cache或重新Apple登入。
+4. 核對表筆數、主鍵、序列、view、正式與封存schema、表單關聯、附件雜湊與權限manifest；既有缺失記錄仍保留，不標成已修復。
+5. 明確設定AMS_DATABASE_MODE=postgresql及目標POSTGRES_*，設定封存庫與旗標；更新SSO公開網址／callback及Nginx／服務路徑。
+6. 重建venv、npm ci、npm run build，先啟網站只讀驗收，再啟接收器與FindMy；同一時間只允許一套正式寫入者。
+7. 兩網站health應回PostgreSQL；真SSO、角色、表單、附件、定位與封存查詢通過後，恢復備份與清理排程並核對輸出。
+
+讀取API驗收可使用scripts/verify_postgresql_api.py；完整寫入流程在隔離庫執行，不以demo成功代替正式驗收。
+
+## 4. 發版與失敗回復
+
+程式更新先隔離檢查、保存目前版本與一致備份、build、restart所用實例。若未改schema且新版本未產生不相容資料，可回原程式與dist；若有schema或資料格式變更，需依遷移計畫處理，不能只降版程式。
+
+切換後已有新表單／附件／定位資料時，先停寫、備份失敗現況，再決定重放或保留新增資料；回復資料庫與持久檔案必須配對版本。對封存前後資料也須同時考慮兩庫，不單獨覆蓋其中一庫。完成回復後再核對SSO、附件、health與上游，才恢復排程。
+
+## 5. 執行紀錄
+
+每次保存版本、時間、備份manifest、核對結果、失敗／缺檔、操作人與回復決定。過去2026-09-22切換紀錄見[遷移基準](POSTGRESQL_MIGRATION_BASELINE.md)，其中舊筆數與服務結果不是本次操作的驗收證據。本次文件更新未實施停寫、還原或切換。

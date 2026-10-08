@@ -3,6 +3,6 @@ Description=POLIMAX PostgreSQL and persistent file backup
 
 [Service]
 Type=oneshot
-WorkingDirectory=/home/c113118138/polimax_next
-ExecStart=/home/c113118138/polimax_next/.venv/bin/python /home/c113118138/polimax_next/scripts/backup_postgresql.py
+WorkingDirectory=/home/c113118138/polimax_refactor
+ExecStart=/home/c113118138/polimax_refactor/.venv/bin/python /home/c113118138/polimax_refactor/scripts/backup_postgresql.py
 UMask=0077

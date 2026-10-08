@@ -1,6 +1,10 @@
-# POLIMAX Next：從登入開始的逐步時序圖
+# polimax_refactor：從登入開始的逐步時序圖
 
-依正式 SSO + MySQL 模式的原始碼整理。閱讀順序為開啟網站 → 登入 → 首頁 → 選擇功能 → 操作 → 登出。功能頁是登入後的分支，不必依序操作全部頁面。外部 SSO 的帳密驗證內部流程不在本專案範圍。
+> 專案名稱與路徑更新：2026-10-07。專案名稱為 `polimax_refactor`，本機目錄為 `/home/c113118138/polimax_refactor`。
+
+> 更新：2026-10-05。現行正式架構為 PostgreSQL／PostGIS + FastAPI + React + 公司 SSO。文件更新依程式與部署紀錄核對，未重新執行正式環境驗收。
+
+依正式 SSO + PostgreSQL 模式的原始碼整理。閱讀順序為開啟網站 → 登入 → 首頁 → 選擇功能 → 操作 → 登出。功能頁是登入後的分支，不必依序操作全部頁面。外部 SSO 的帳密驗證內部流程不在本專案範圍。
 
 各圖以 autonumber 標示訊息順序。前端包含 React 與瀏覽器；後端為 FastAPI。查詢圖表示需要取得資料時的流程，React Query 可能重用仍有效的快取，並非每次點擊都重新發送請求。
 
@@ -172,7 +176,7 @@ sequenceDiagram
     actor U as 使用者
     participant F as Shell／CalendarPage
     participant A as FastAPI
-    participant D as MySQL
+    participant D as PostgreSQL
     participant J as JSON／設定檔
     F->>F: 顯示帳號、側欄與目前路由
     par 資源
@@ -292,7 +296,7 @@ sequenceDiagram
     participant F as BookingForm
     participant A as FastAPI
     participant R as Store／Repository
-    participant D as MySQL
+    participant D as PostgreSQL
     participant J as JSON 表單
     F->>A: POST /api/bookings 或 PUT /api/bookings/{fid}
     A->>A: 驗證 session 與 request body
@@ -300,7 +304,7 @@ sequenceDiagram
         A->>A: 檢查 create、submit、欄位權限
     end
     A->>R: session(write=True)
-    R->>D: GET_LOCK，最多等 15 秒
+    R->>D: pg_try_advisory_lock 輪詢，最多等 15 秒
     alt 取鎖失敗
         R-->>A: 409 其他表單正在儲存
         A-->>F: 重試訊息
@@ -313,7 +317,7 @@ sequenceDiagram
         R->>D: 查資源及未取消的重疊預約，鎖定查詢列
         R->>R: 檢查內容、時段及本張申請內重疊
         alt 權限、內容、版本或時段不符
-            R->>D: ROLLBACK，RELEASE_LOCK
+            R->>D: ROLLBACK，pg_advisory_unlock
             A-->>F: 錯誤訊息，保留輸入
         else 驗證通過
             R->>R: 分配新編號，或沿用 D/E 修改編號
@@ -329,7 +333,7 @@ sequenceDiagram
             R->>J: 舊檔存在時備份 .bak.json
             R->>J: os.replace 原子替換單一檔案
             alt 檔案安裝與 SQL 提交成功
-                R->>D: COMMIT，RELEASE_LOCK
+                R->>D: COMMIT，pg_advisory_unlock
                 A-->>F: 預約物件與 id
                 F->>F: invalidate 非 me 查詢，reset 表單
                 F->>F: 導向 /bookings/{result.id}，帶 saved=true
@@ -338,7 +342,7 @@ sequenceDiagram
             else 檔案寫入或 SQL 提交失敗
                 R->>D: ROLLBACK
                 R->>J: 反向還原已替換檔，移除本次新建檔
-                R->>D: RELEASE_LOCK
+                R->>D: pg_advisory_unlock
                 A-->>F: 儲存錯誤
             end
         end
@@ -356,7 +360,7 @@ sequenceDiagram
     actor U as 使用者
     participant F as BookingList／BookingDetail
     participant A as FastAPI
-    participant D as MySQL／JSON
+    participant D as PostgreSQL／JSON
     U->>F: 點側欄借用紀錄或車輛使用歷史
     F->>A: GET /api/bookings 與 GET /api/resources
     A->>D: 查詢既有資料
@@ -402,7 +406,7 @@ sequenceDiagram
     participant F as 明細／Stage 表單視窗
     participant A as FastAPI
     participant R as Repository
-    participant D as MySQL
+    participant D as PostgreSQL
     participant J as B／C JSON
     loop 依表格順序進行四次
         U->>F: 按目前狀態對應的下一階段按鈕
@@ -441,7 +445,7 @@ sequenceDiagram
     actor U as 使用者
     participant F as StageList／StagePage
     participant A as FastAPI
-    participant D as JSON／MySQL
+    participant D as JSON／PostgreSQL
     U->>F: 開啟 /stages，選 B 或 C
     F->>A: GET /api/stages?kind=B 或 C
     A-->>F: 可讀清單
@@ -476,39 +480,32 @@ sequenceDiagram
     actor U as 使用者
     participant F as Upload／瀏覽器
     participant A as FastAPI
-    participant L as 本地暫存與名稱索引
-    participant S as 原檔案服務
+    participant L as 專案files原檔與metadata
     U->>F: 選擇檔案
     loop 每個檔案
-        F->>A: POST /api/files，body 為 bytes
+        F->>A: POST /api/files，body為bytes
         Note over F,A: X-AMS-Client、X-File-Name、Content-Type、X-File-Purpose
-        A->>A: 驗證登入及至少一種表單 create 權限
-        A->>L: 串流暫存並累計大小
-        Note over A,L: 一般上限 10 MiB；stage-photo 上限 1 GiB
-        A->>S: POST /upload，multipart file
-        S-->>A: file_uuid 或 uuid
-        A->>A: 驗證 UUID 格式
-        A->>L: 刪除暫存，保存檔名等索引
-        A-->>F: metadata
-        F->>F: 將附件資訊放入表單狀態
+        A->>A: 登入及任一表單create權限
+        A->>L: 建立UUID原檔、串流計算大小、fsync
+        Note over A,L: 一般10MiB；stage-photo1GiB
+        A->>L: 暫存metadata並原子替換
+        A-->>F: id/uuid/name/mime/size/owner
+        F->>F: 放入表單狀態
     end
     U->>F: 送出所屬表單
-    F->>A: 附件資訊隨表單內容送出
-    Note over F,A: 上傳成功與表單儲存是兩個操作
+    F->>A: 另保存表單與附件關聯
     U->>F: 點預覽／下載
-    F->>A: GET /api/files/{id}，預覽加 preview=true
+    F->>A: GET /api/files/{id}，預覽加preview=true
     A->>A: 驗證登入與識別碼
-    alt 本地沒有檔案 bytes（正常轉接上傳）
-        A-->>F: 307 至原服務 /preview/{id} 或 /file/{id}
-        F->>S: 依重新導向讀取檔案
-        S-->>F: 預覽／下載內容
-    else 本地存在檔案與索引
-        A->>L: 讀取檔案
-        A-->>F: FileResponse，安全圖片可 inline，其餘 attachment
+    A->>L: 檢查原檔與metadata
+    alt 缺原檔或metadata
+        A-->>F: 404
+    else 檔案存在
+        A-->>F: JPEG/PNG/WebP/GIF可inline，其餘attachment
     end
 ```
 
-超過上限回傳 413；外部上傳失敗／UUID 無效回傳 502。失敗時清理暫存並在前端顯示錯誤。
+上傳與表單提交是兩個操作。超限413，I/O錯誤503；失敗清理原檔。讀檔目前只檢查登入，沒有逐附件owner授權。沒有外部upload或重新導向舊檔案服務。
 
 ## 13｜車輛／儀器與附屬紀錄管理
 
@@ -518,7 +515,7 @@ sequenceDiagram
     actor U as 使用者
     participant F as Assets／AssetDetail
     participant A as FastAPI
-    participant D as MySQL
+    participant D as PostgreSQL
     U->>F: 開啟 /vehicles 或 /equipment
     F->>F: Guard 檢查對應管理表單 read
     F->>A: GET /api/resources
@@ -565,7 +562,7 @@ sequenceDiagram
     actor U as 使用者
     participant F as Maps 頁面
     participant A as FastAPI
-    participant D as MySQL 定位資料
+    participant D as PostgreSQL 定位資料
     alt 最新位置及軌跡
         U->>F: 開啟 /positions
         F->>A: GET /api/resources 與 /api/positions
@@ -603,7 +600,7 @@ sequenceDiagram
     end
 ```
 
-定位資料來自既有匯入程序。沒有資料回傳空值／空清單，查詢不會產生新座標。
+GPS／掃描資料來自外部PMXAgent接收器；FindMy由專案integrations/findmy匯入。沒有資料回傳空值／空清單，查詢不會產生新座標。
 
 ## 15｜Beacon 管理、權限同步與資料來源
 
@@ -613,7 +610,7 @@ sequenceDiagram
     actor U as 使用者
     participant F as Beacons／Integrations
     participant A as FastAPI
-    participant D as MySQL／政策檔
+    participant D as PostgreSQL／政策檔
     alt Beacon 管理
         U->>F: 開啟 /beacons
         F->>A: GET /api/beacons 與 /api/resources
@@ -635,7 +632,7 @@ sequenceDiagram
             U->>F: 點權限同步
             F->>A: POST /api/permissions/sync
             A->>A: 檢查 Administration.write
-            A->>D: permissions.source() 重新載入 app.state.policy
+            A->>D: sso.with_permissions(user)重讀政策／快照
             A-->>F: 版本
             F->>F: api() 使 me 失效，頁面 invalidate 其他查詢
         end
@@ -699,8 +696,38 @@ sequenceDiagram
 | 出回程 | src/Stages.tsx |
 | 資產、地圖、管理 | src/Assets.tsx、src/Maps.tsx、src/Admin.tsx |
 | 附件 UI | src/ui.tsx |
-| 正式 API、授權與附件轉接 | backend/legacy_api.py |
+| 正式 API、授權與本機附件保存與下載 | backend/legacy_api.py |
 | SQL、JSON、鎖、交易、狀態 | backend/legacy_store.py |
 | 定位、Beacon、通知、匯入 | backend/legacy_integrations.py |
 
 這些圖依原始碼靜態分析，不代表已操作真實公司帳號完成端到端驗證。外部 IdP／檔案服務只呈現本專案可確認的邊界。隔離 demo／test 的角色選擇登入不屬於本文件的正式流程。
+
+## 17｜歷史封存與完成登記
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 管理員
+    participant F as Archive
+    participant A as FastAPI
+    participant D as PostgreSQL正式庫
+    participant X as PostgreSQL封存庫
+    U->>F: 開啟/archive
+    F->>A: GET /api/archive/status、/catalog
+    A->>A: Administration與對應业务完整權限
+    F->>A: GET /api/archive/live/{name}?page=0
+    A->>D: 每頁50筆資料與completion
+    A-->>F: items/has_more
+    U->>F: 登記完成時間與說明
+    F->>A: PUT /api/archive/live/{name}/{key}/completion
+    A->>D: 保存完成時間、操作者與內容指紋
+    U->>F: 查歷史
+    F->>A: GET /api/archive/history?name=...
+    A->>X: 查已驗證封存批次
+    A-->>F: 清單／明細
+    F->>A: GET /api/archive/history/{id}/file?path=...
+    A->>X: 檢查批次附件索引、讀分塊
+    A-->>F: 串流原檔下載
+```
+
+頁面只做查詢與完成登記，實際搬移／清理由archive_maintenance背景作業執行。原始封存資料對欄位、owner或allow_list受限帳號拒絕存取；取消完成登記用DELETE同路徑。詳細保留條件見[封存規格](deploy/ARCHIVE_RETENTION.md)。

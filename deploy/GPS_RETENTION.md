@@ -1,65 +1,60 @@
-# GPS 保存與查詢
+# PostgreSQL 定位保存與查詢
 
-> 本文清理部署指令已由 [PostgreSQL 歷史封存與清理](ARCHIVE_RETENTION.md) 取代。
-> `gps_maintenance.py` 現在轉接「封存 → 驗證 → 刪除」，不再支援直接刪除、
-> MySQL 清理或 `--ensure-indexes`。下方舊部署段落僅為歷史紀錄。
+> 專案名稱與路徑更新：2026-10-07。專案名稱為 `polimax_refactor`，本機目錄為 `/home/c113118138/polimax_refactor`。
 
-正式 PostgreSQL GPS 軌跡僅查最近 90 天（以 created_at 接收時間為準），單次跨度最多 90 天。
-地圖預設最近 30 天，提供 30/60/90 天與自訂日期。資料庫端先排除無效座標，再按時間排序抽樣；預設最多回傳 1000 點，保留起终點。長期間折線是摘要，縮小時間範圍可看細節。
+更新：2026-10-05。正式定位資料只使用PostgreSQL。清理已統一採[封存→驗證→刪除](ARCHIVE_RETENTION.md)，沒有MySQL清理、直接刪除或ensure-indexes操作。
 
-清理保留最近 90 天，另保留每個 client_id 按 record_time/id 排序的最後一筆，不論多舊，以維持最新位置查詢。這些例外不會出現在 90 天歷史軌跡內。created_at 為 NULL 的舊資料不自動刪除，需另行檢查。
+## 查詢契約
 
-現行使用 PostgreSQL；舊 MySQL 8+ 模式仍保留。請在專案根目錄使用現有後端環境設定：
+最新車輛位置`GET /api/positions`：CarList.client_id對gps_readings.client_id，依record_time/id倒序取一筆；即使最後位置超過90天仍可供最新位置查詢，沒有結果回null與missing。此API只處理車輛。
 
-```bash
-# 唯讀預覽首批候選數（最多 1000 筆，不是全部候選總數）
-.venv/bin/python scripts/gps_maintenance.py
-# 部署時建立缺少的查詢複合索引；這一步會修改 schema，但不刪資料
-.venv/bin/python scripts/gps_maintenance.py --ensure-indexes
-# 手動清理，每批 1000 筆，單次最多 100 批
-.venv/bin/python scripts/gps_maintenance.py --apply
-```
+軌跡`GET /api/trajectory/{rid}?start=...&end=...&limit=1000`：
 
-每日清理使用隨附的 systemd user service/timer，部署前核對絕對路徑及設定來源。
-若 API 由 service Environment 注入資料庫設定，清理 service 必須套用相同設定。
+- carMap.read；start必須早於end，單次跨度最多90天，過舊start裁切至目前減90天。
+- 使用created_at接收時間，起含迄不含；record_time是裝置記錄時間。
+- 數值latitude/longitude須在合法範圍，兩欄絕對值均>0.001。
+- 依created_at/id排序，在資料庫抽樣保留首尾；limit預設1000、限制2..10000。
+- 回points/count/total，total是有效原始筆數、count是實際回傳；長時段折線只是摘要。
+- 地圖預設30天，提供30/60/90天及自訂；API讀數值欄位，不提供PostGIS來源選擇。
 
-```bash
-mkdir -p ~/.config/systemd/user
-cp deploy/polimax-gps-cleanup.service deploy/polimax-gps-cleanup.timer ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now polimax-gps-cleanup.timer
-systemctl --user list-timers polimax-gps-cleanup.timer
-journalctl --user -u polimax-gps-cleanup.service
-```
+## 保留群組與時間
 
-排程每日台北時間 03:30 執行；Persistent 會補跑錯過的排程。主機無登入也要執行時，管理員需確保使用者服務可持續運作（linger）。
-不會自動 OPTIMIZE TABLE，刪除空間可供 InnoDB 重用，不保證立即縮小磁碟檔案。
-程式碼與排程範本加入並不代表排程已安裝啟用。原始定位匯入仍由既有上游程序負責。
-
-測試：
-
-```bash
-.venv/bin/python tests/test_gps_history.py
-GPS_TEST_MYSQL=1 .venv/bin/python tests/test_gps_history.py
-```
-
-MySQL 測試只使用 localhost:13316 隔離測試服務及隨機資料庫，不使用專案連線設定。
-
-## Beacon 與儀器定位保存（已加入同一排程）
-
-除了 gps_readings，同一支腳本也處理以下歷史表；不修改 BeaconList、EquipmentList 或借用表單：
-
-| 表 | 90 天依據 | 保留例外 |
+| 表 | 90天依據 | 最新資料例外 |
 | --- | --- | --- |
-| new_reports | timestamp | 每個 sheet_id 最新 timestamp/id 的一筆 |
-| Outdoor_Beacon_readings | created_at | 每個 client_id/major/minor 最新接收與最新記錄時間的資料 |
-| FindMy | created_at | 每個 major 最新 timestamp 與最新 created_at 的資料 |
+| gps_readings | created_at，台北時間 | 每client_id最新record_time/id |
+| new_reports | timestamp，UTC | 每sheet_id最新timestamp/id |
+| Outdoor_Beacon_readings | created_at，台北時間 | 每client_id/major/minor最新created_at與record_time |
+| FindMy | created_at，UTC | 每major最新timestamp與created_at |
+| sensor_readings | created_at，台北時間 | 每client_id/major最新created_at與timestamp |
 
-最新接收和最新記錄若不同，會保留兩筆，避免延遲匯入造成最後位置遺失。
-儀器設備沒有獨立歷史軌跡表，相關 Beacon 定位依以上來源清理。
-時間或設備識別為 NULL 的資料保留，需人工釐清；缺少的歷史表會記錄並跳過。
-每張表每批最多 1000 筆，每次最多 100 批，日誌分表列出結果。
-FindMy 舊匯入器用 UTC 寫入 DATETIME，使用 UTC 截止時間。
-new_reports 尚無上游時區資訊，使用 UTC 截止時間；若實際寫入台北時間，會保守多留最多 8 小時。
-Outdoor TIMESTAMP 以 MySQL session +08:00 讀取比較。
-使用既有 polimax-gps-cleanup.timer，每日台灣時間 03:30，無須再建立第二個排程。
+最新接收／記錄可能不同而保留多筆。NULL日期或設備識別不自動清理；缺表記錄並跳過。主檔CarList／EquipmentList／BeaconList不列入清理。
+
+## 維運
+
+以下預設只預覽有限批次，筆數不是全庫總數：
+
+```bash
+.venv/bin/python scripts/archive_maintenance.py
+```
+
+完成雙庫初始化、預覽及備份後，由已配置服務執行：
+
+```bash
+.venv/bin/python scripts/archive_maintenance.py --apply
+systemctl --user status polimax-gps-cleanup.timer
+journalctl --user -u polimax-gps-cleanup.service -n 100 --no-pager
+```
+
+`gps_maintenance.py`只是同一封存工具的相容入口，不存在另一套刪除邏輯。每日03:30 Asia/Taipei、Persistent；先提交封存、讀回驗證與核對來源才刪除。缺JSON／附件的業務資料留在正式庫；本地原檔不自動回收。
+
+目前背景定位生產者包括外部MQTT接收器與[專案內FindMy匯入器](FINDMY_POSTGRESQL.md)。頁面刷新只讀資料庫，不會觸發上游採集。
+
+## 驗證
+
+```bash
+.venv/bin/python tests/test_retention.py
+npm run build
+node tests/browser_location.mjs
+```
+
+retention測試使用臨時PostgreSQL16／PostGIS；地圖瀏覽器測試使用隔離demo與mock，需Chromium及系統函式庫。完整說明見[PostGIS](POSTGIS.md)。本次文件更新未重跑測試。

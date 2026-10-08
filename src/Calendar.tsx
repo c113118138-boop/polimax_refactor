@@ -7,7 +7,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import listPlugin from "@fullcalendar/list";
 import interactionPlugin from "@fullcalendar/interaction";
 import luxonPlugin from "@fullcalendar/luxon3";
-import { can } from "./Access";
+import { can, hasWorkspaceAccess } from "./Access";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -37,13 +37,17 @@ export default function CalendarPage({ onCreate }: { onCreate: () => void }) {
   const navigate = useNavigate(),
     u = useUser(),
     ref = useRef<FullCalendar>(null);
+  const hasAccess = hasWorkspaceAccess(u);
+  const [accessError, setAccessError] = useState("");
   const resources = useQuery({
       queryKey: ["resources"],
       queryFn: () => api<Resource[]>("/resources"),
+      enabled: hasAccess,
     }),
     bookings = useQuery({
       queryKey: ["bookings"],
       queryFn: () => api<Booking[]>("/bookings"),
+      enabled: hasAccess,
     });
   const [selectedIds, setSelected] = useState<number[] | null>(null),
     [room, setRoom] = useState(true),
@@ -61,19 +65,21 @@ export default function CalendarPage({ onCreate }: { onCreate: () => void }) {
   const holidays = useQuery({
     queryKey: ["holidays"],
     queryFn: () => api<any[]>("/holidays"),
+    enabled: hasAccess,
   });
   const showHoliday = ["Enabled", "Visible"].includes(
     u.permissions.ui["calendar.options.holidayToggle"],
   );
   useEffect(() => {
+    if (!hasAccess) return;
     const timer = setTimeout(() => {
       api("/notifications/check", "POST").catch(() => {});
     }, 2000);
     return () => clearTimeout(timer);
-  }, []);
-  const cars = resources.data?.filter((r) => r.kind === "vehicle") || [],
-    rs = resources.data || [],
-    bs = bookings.data || [];
+  }, [hasAccess]);
+  const cars = hasAccess ? resources.data?.filter((r) => r.kind === "vehicle") || [] : [],
+    rs = hasAccess ? resources.data || [] : [],
+    bs = hasAccess ? bookings.data || [] : [];
   const selected = selectedIds ?? cars.map((car) => car.id);
   const visible = (b: Booking, s: { resource_id: number }) =>
     b.kind === "A"
@@ -137,6 +143,7 @@ export default function CalendarPage({ onCreate }: { onCreate: () => void }) {
   }
   return (
     <>
+      <ErrorBox error={accessError} />
       <PageHead
         eyebrow="YOUR RESOURCE WORKSPACE"
         title="每一段行程，都安排妥當。"
@@ -256,14 +263,14 @@ export default function CalendarPage({ onCreate }: { onCreate: () => void }) {
               ))}
             </div>
           </div>
-          {selected.length === 0 && (
+          {hasAccess && selected.length === 0 && (
             <div className="calendar-hint">
               <SlidersHorizontal size={15} />
               請勾選右側車牌以顯示車輛預約。作業區預設顯示。
             </div>
           )}
           <ErrorBox error={bookings.error || resources.error} />
-          {bookings.isPending ? (
+          {hasAccess && bookings.isPending ? (
             <Loading />
           ) : (
             <>
@@ -298,7 +305,7 @@ export default function CalendarPage({ onCreate }: { onCreate: () => void }) {
                   }}
                   events={[
                     ...events,
-                    ...(holiday
+                    ...(hasAccess && holiday
                       ? (holidays.data || []).map((h, i) => ({
                           id: "holiday-" + i,
                           title: h.title,
@@ -321,6 +328,7 @@ export default function CalendarPage({ onCreate }: { onCreate: () => void }) {
                     )
                   }
                   dateClick={(arg) => {
+                    if (!hasAccess) { setAccessError("沒有權限"); return; }
                     if (view === "dayGridMonth") {
                       setDay(arg.dateStr);
                       setView("resourceDay");
@@ -569,6 +577,8 @@ export default function CalendarPage({ onCreate }: { onCreate: () => void }) {
             <div className="actions">
               <button
                 className="button primary"
+                disabled={detail.detail_allowed === false}
+                title={detail.detail_allowed === false ? "無法修改他人借用紀錄" : undefined}
                 onClick={() =>
                   navigate(
                     "/bookings/" +

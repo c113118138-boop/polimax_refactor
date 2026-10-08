@@ -1,0 +1,61 @@
+{
+  "client_id": "PLM7",
+  "start": "2026-08-31T17:14:09.358420",
+  "end": "2026-09-30T17:14:09.358420",
+  "repeats": 50,
+  "limit": 1000,
+  "results": {
+    "latest": {
+      "rows": 1,
+      "coordinates_match": true,
+      "variants": {
+        "current_all_columns": {
+          "median_ms": 0.727,
+          "p95_ms": 0.904,
+          "min_ms": 0.603
+        },
+        "numeric_columns": {
+          "median_ms": 0.52,
+          "p95_ms": 0.776,
+          "min_ms": 0.437
+        },
+        "location_xy": {
+          "median_ms": 0.543,
+          "p95_ms": 0.798,
+          "min_ms": 0.448
+        },
+        "location_wkb": {
+          "median_ms": 0.689,
+          "p95_ms": 0.904,
+          "min_ms": 0.594
+        }
+      }
+    },
+    "trajectory": {
+      "rows": 92,
+      "coordinates_match": true,
+      "variants": {
+        "current_all_columns": {
+          "median_ms": 4.244,
+          "p95_ms": 5.291,
+          "min_ms": 4.017
+        },
+        "numeric_columns": {
+          "median_ms": 3.511,
+          "p95_ms": 4.107,
+          "min_ms": 3.263
+        },
+        "location_xy": {
+          "median_ms": 3.287,
+          "p95_ms": 3.781,
+          "min_ms": 3.096
+        },
+        "location_wkb": {
+          "median_ms": 7.137,
+          "p95_ms": 7.832,
+          "min_ms": 6.881
+        }
+      }
+    }
+  }
+}

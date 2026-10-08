@@ -1,8 +1,12 @@
-# POLIMAX Next 時序圖
+# polimax_refactor 時序圖
 
-從登入頁開始的 16 段詳細流程，請見 [逐步時序圖](USER_JOURNEY_SEQUENCE.md)。
+> 專案名稱與路徑更新：2026-10-07。專案名稱為 `polimax_refactor`，本機目錄為 `/home/c113118138/polimax_refactor`。
 
-依目前正式 MySQL／SSO 模式的原始碼整理，不含隔離 demo 模式。箭頭代表請求或內部呼叫，虛線代表回應；圖中省略部分欄位與 UI 操作。所有受保護 API 都會驗證 session，並依端點檢查權限。
+> 更新：2026-10-05。現行正式架構為 PostgreSQL／PostGIS + FastAPI + React + 公司 SSO。文件更新依程式與部署紀錄核對，未重新執行正式環境驗收。
+
+從登入頁開始的詳細流程，請見 [逐步時序圖](USER_JOURNEY_SEQUENCE.md)。
+
+依目前正式 PostgreSQL／SSO 模式的原始碼整理，不含隔離 demo 模式。箭頭代表請求或內部呼叫，虛線代表回應；圖中省略部分欄位與 UI 操作。所有受保護 API 都會驗證 session，並依端點檢查權限。
 
 ## 1. SSO 登入
 
@@ -49,8 +53,8 @@ sequenceDiagram
     participant F as React／React Query
     participant A as FastAPI
     participant R as Store／Repository
-    participant D as 既有 MySQL
-    participant J as 既有 JSON 表單
+    participant D as 既有 PostgreSQL
+    participant J as 專案持久 JSON 表單
     U->>F: 開啟預約日曆
     par 資源查詢
         F->>A: GET /api/resources
@@ -88,15 +92,15 @@ sequenceDiagram
     participant F as BookingForm
     participant A as FastAPI
     participant R as Store／Repository
-    participant D as 既有 MySQL
-    participant J as 既有 JSON 表單
+    participant D as 既有 PostgreSQL
+    participant J as 專案持久 JSON 表單
     U->>F: 填寫表單並送出
     F->>F: 檢查欄位、時間與明細
     F->>A: POST /api/bookings 或 PUT /api/bookings/{fid}
     A->>A: 驗證 session
     Note over A,R: 新增先檢查 create／submit；修改在鎖內讀取舊資料後檢查 write／擁有者／欄位權限
     A->>R: 開啟寫入 session
-    R->>D: GET_LOCK（最多等待 15 秒）
+    R->>D: pg_try_advisory_lock 輪詢（最多 15 秒）
     R->>D: 讀取資源、既有預約與重疊時段
     R->>R: 驗證 revision、表單內容與時段衝突
     alt 權限、版本、時段或欄位驗證失敗
@@ -110,7 +114,7 @@ sequenceDiagram
         R->>J: 寫暫存檔、備份既有檔、原子替換
         alt 檔案寫入與 SQL 提交成功
             R->>D: COMMIT
-            R->>D: RELEASE_LOCK
+            R->>D: pg_advisory_unlock
             R-->>A: 儲存結果
             A-->>F: 預約 id 與內容
             F->>F: invalidate() 使資料查詢失效
@@ -120,7 +124,7 @@ sequenceDiagram
         else 檔案寫入或 SQL 提交失敗
             R->>D: ROLLBACK
             R->>J: 還原已替換的檔案
-            R->>D: RELEASE_LOCK
+            R->>D: pg_advisory_unlock
             A-->>F: 錯誤訊息
             F-->>U: 顯示儲存失敗
         end
@@ -137,12 +141,12 @@ sequenceDiagram
     participant F as 出回程表單
     participant A as FastAPI
     participant R as Store／Repository
-    participant D as MySQL form_flows
+    participant D as PostgreSQL form_flows
     participant J as B／C JSON 表單
     loop 每次提交下一階段，共四階段
         U->>F: 填寫駕駛、里程、時間等資料
         F->>A: POST /api/bookings/{fid}/advance<br/>content、expected_status、revision
-        A->>R: 開啟寫入 session，取得 MySQL 命名鎖
+        A->>R: 開啟寫入 session，取得 PostgreSQL session advisory lock
         R->>D: 讀取目前流程狀態
         A->>A: 檢查該階段操作及擁有者權限
         R->>R: 驗證版本、預期狀態、必填資料與里程
@@ -165,32 +169,61 @@ sequenceDiagram
 
 狀態順序：`PENDING`（已預約）→ `DEPARTURE`（已發車）→ `DEPARTURE_ARRIVED`（發車已抵達）→ `RETURN`（已開始回程）→ `RETURN_ARRIVED`（已完成）。儲存失敗的回滾方式同圖 3。
 
-## 5. 附件上傳
+## 5. 附件上傳與讀取
 
 ```mermaid
 sequenceDiagram
     actor U as 使用者
     participant F as React 前端
     participant A as FastAPI
-    participant L as 本地暫存與附件名稱索引
-    participant S as 原檔案服務
+    participant L as .data/files 原檔與metadata
     U->>F: 選擇附件或照片
-    F->>A: POST /api/files（檔案內容與檔名標頭）
-    A->>A: 驗證登入、上傳權限及大小
-    A->>L: 串流寫入暫存檔
-    A->>S: POST /upload（multipart 檔案）
-    alt 上傳成功且 UUID 有效
-        S-->>A: file_uuid 或 uuid
-        A->>L: 刪除暫存檔，保存附件名稱索引
-        A-->>F: UUID、檔名、類型、大小
-        F->>F: 將附件資訊放入表單
-        Note over F,A: 後續送出表單時才保存附件關聯
-    else 外部服務失敗或回應無效
-        A->>L: 刪除暫存檔
-        A-->>F: 502 上傳失敗
-        F-->>U: 顯示錯誤
+    F->>A: POST /api/files，raw body與檔名標頭
+    A->>A: 驗證登入、任一表單create與大小
+    A->>L: UUID原檔串流寫入、fsync
+    A->>L: 暫存metadata並原子替換uuid.json
+    A-->>F: id/uuid/name/mime/size/owner
+    F->>F: 保存附件到表單狀態
+    F->>A: 另送表單，保存附件關聯
+    U->>F: 預覽或下載
+    F->>A: GET /api/files/{id}?preview=true
+    A->>L: 檢查原檔與metadata
+    alt 缺檔或索引
+        A-->>F: 404
+    else 檔案完整
+        A-->>F: FileResponse，安全圖片inline／其他attachment
     end
 ```
+
+一般附件10MiB、stage-photo1GiB。超限413、檔案I/O失敗503；上傳失敗清理原檔。沒有外部附件服務、upload轉送或307fallback。
+
+## 6. FindMy、封存與備份
+
+```mermaid
+sequenceDiagram
+    participant T as systemd timer
+    participant I as FindMy 匯入器
+    participant U as Apple FindMy
+    participant D as PostgreSQL正式庫
+    participant R as 封存引擎
+    participant X as PostgreSQL封存庫
+    participant B as 備份工具
+    T->>I: 每小時匯入
+    I->>U: 用專案Apple session取得報告
+    U-->>I: UTC定位回報
+    I->>D: 去重交易寫FindMy與new_reports
+    T->>R: 每日03:30封存
+    R->>D: 取得共用鎖、篩選與鎖定來源
+    R->>X: 保存原列、JSON、附件區塊並提交
+    R->>X: 新交易讀回驗證
+    R->>D: 再核對來源相同才刪除並提交
+    T->>B: 每日04:00備份（依主機時區）
+    B->>D: 共用應用鎖與正式dump
+    B->>X: 封存啟用時產生封存dump
+    B->>B: 打包持久資料、寫SHA-256 manifest
+```
+
+跨庫不是單一交易；缺檔、內容不符保留來源。備份應用鎖不涵蓋全部外部接收器；跨系統搬機要停所有寫入者。
 
 ## 程式依據
 
@@ -198,5 +231,5 @@ sequenceDiagram
 - `src/Calendar.tsx`、`src/Bookings.tsx`：日曆、預約查詢與送出。
 - `src/Stages.tsx`：出回程送出。
 - `backend/sso.py`：SSO、state、session、權限與 token 刷新。
-- `backend/legacy_api.py`：正式 API、權限與附件轉接。
-- `backend/legacy_store.py`：MySQL／JSON 整合、命名鎖、交易與狀態轉換。
+- `backend/legacy_api.py`：正式 API、權限與本機附件保存與下載。
+- `backend/legacy_store.py`：PostgreSQL／JSON 整合、advisory lock、交易與狀態轉換。

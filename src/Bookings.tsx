@@ -54,7 +54,7 @@ import {
 } from "./ui";
 import { useUser } from "./App";
 import { StageForm, StageView } from "./Stages";
-import { can, bookingDoc, Scope } from "./Access";
+import { can, canFillDeparture, bookingDoc, Scope } from "./Access";
 const purposeOptions = [
   "廠內",
   "廠外施工",
@@ -1242,9 +1242,9 @@ export function BookingList({ onCreate }: { onCreate: () => void }) {
                 {results.map((b) => (
                   <tr key={b.id}>
                     <td>
-                      <Link className="table-title" to={"/bookings/" + b.id}>
+                      {b.detail_allowed === false ? <span className="table-title">借用紀錄</span> : <Link className="table-title" to={"/bookings/" + b.id}>
                         {b.content.title}
-                      </Link>
+                      </Link>}
                       <small className="mono">
                         {b.id} · {kindNames[b.kind]}
                       </small>
@@ -1280,13 +1280,19 @@ export function BookingList({ onCreate }: { onCreate: () => void }) {
                       <Status status={b.status} />
                     </td>
                     <td>
-                      <Link
+                      {b.detail_allowed === false ? (
+                        <span title="無法修改他人借用紀錄" style={{ display: "inline-flex", cursor: "not-allowed" }}>
+                          <button type="button" className="icon-button" aria-label="無法修改他人借用紀錄" aria-disabled="true" style={{ cursor: "not-allowed", opacity: 0.45 }}>
+                            <ChevronRight size={18} />
+                          </button>
+                        </span>
+                      ) : <Link
                         className="icon-button"
                         aria-label={"查看 " + b.id}
                         to={"/bookings/" + b.id}
                       >
                         <ChevronRight size={18} />
-                      </Link>
+                      </Link>}
                     </td>
                   </tr>
                 ))}
@@ -1399,6 +1405,8 @@ export function BookingDetail() {
                 <button
                   className="button primary"
                   onClick={() => setStage(true)}
+                  disabled={["PENDING", "DEPARTURE"].includes(b.status) && !canFillDeparture(u, b)}
+                  title={["PENDING", "DEPARTURE"].includes(b.status) && !canFillDeparture(u, b) ? "只能填寫自己的發車表單；代填需要最高管理權限" : undefined}
                 >
                   {nextStates[b.status]}
                   <ArrowRight size={16} />

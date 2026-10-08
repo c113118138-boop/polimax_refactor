@@ -1,51 +1,69 @@
-# POLIMAX 交付驗證紀錄
+# polimax_refactor 現行驗收與測試範圍
 
-交付日期：2026-09-11。依據：`../POLIMAX_FUNCTIONAL_SPEC.md`。
+> 專案名稱與路徑更新：2026-10-07。專案名稱為 `polimax_refactor`，本機目錄為 `/home/c113118138/polimax_refactor`。
 
-本次完成的是第 15.5 節允許的本地測試來源版本。可操作完整資源預約、車輛出回程、資產維護、附件、定位報告與測試通知；企業 SSO、正式 HR／權限中心及真實定位／通知平台並未接入。
+更新：2026-10-05。正式架構為React／FastAPI／PostgreSQL／PostGIS／公司SSO，本地JSON及附件持久保存。SQLite僅是隔離demo，MySQL不再是正式驗收環境。
 
-## 已補齊
+## 1. 現行驗收矩陣
 
-| 範圍 | 交付結果 |
+| 範圍 | 必須核對 |
 | --- | --- |
-| 獨立啟動 | 移除舊專案 env 匯入；獨立 Python 環境、依賴清單與 npm lockfile；單一 FastAPI 服務提供前端及 API |
-| 權限 | AMS 多角色 OR、指定動作 create/write/submit/delete/read、遞迴欄位讀寫、UI 狀態、政策快照／版本切換／失敗回退、批次查詢 |
-| 預約 | A/D/E 保存、包含邊界衝突、同表衝突、SQLite 跨連線序列化、A 換號追溯、D/E 原號修訂、软刪除釋放 |
-| A/B/C 流程 | 一張 A 共用流程、B/C 父關聯、完整檢查與人員、車輛與預約時間、四階段提交、里程驗證、分類照片、修訂不倒退、刪除後不完整提示 |
-| 查詢與導覽 | 申請分組、日期／狀態／車牌／緣由／地點／人員篩選、完成歷史、B/C 查詢、桌面側欄收合及手機抽屜 |
-| 資產與附件 | 車輛／設備主檔、配件、保險／費用／維護／保養廠／管理人員；保單與理賠附件分開；照片及一般附件持久保存 |
-| 定位與 Beacon | Beacon CRUD、十六進位 ID／major 對應、GPS／FindMy／掃描報告保存與匯入、穩定回報時間、無效點處理、首尾抽樣、來源時間比較 |
-| 通知 | 本地測試通知記錄、到期分級、無管理人略過、成功七天去重、失敗可重試、成功全車檢查間隔兩分鐘 |
-| 時區 | 台北業務時間；瀏覽器位於洛杉磯時，日曆與輸入預覽仍以台北顯示；秒數往返保留 |
-| 示範資料 | 七種需求、五種流程狀態、跨日／多時段、停用／已刪除資產、附件、千點以上 GPS 與通知日期邊界；新增示範不覆寫原資料 |
+| 部署 | dist與API可讀、health回PostgreSQL、兩入口共享DB與持久資料 |
+| SSO | 真公司帳號、callback、state一次性、session過期與refresh、登出 |
+| 權限 | 多角色、read/create/write/submit/delete、欄位限制與owner；sync只重讀本地來源 |
+| A/D/E | 實際保存、重載編輯、包含邊界衝突、停用資源、revision；A換號、D/E原號 |
+| A/B/C | 四次advance、B/C父關聯、檢查與人員、里程確認、抵達不小於出發、重複／過期送出409 |
+| 資產與紀錄 | 車輛／設備、保險／費用／維護／車庫／管理人員、軟刪除與唯一識別 |
+| 附件 | 原檔與metadata保存、10MiB／stage-photo1GiB、圖片預覽、下載、缺檔404；無舊服務轉送 |
+| 定位 | 直接數值座標、車輛client_id、最近90天軌跡、抽樣與NULL；真上游寫入另驗 |
+| FindMy | Apple session、背景匯入、FindMy/new_reports一致與去重、UTC時間 |
+| 場內掃描 | 外部接收資料、每站每major最新、5分鐘在線、10秒UI刷新 |
+| 封存 | 完成登記、來源指紋、封存讀回驗證、缺檔保留、最新定位例外、原始資料權限 |
+| 備份還原 | 雙庫dump、持久檔案、SHA-256、隔離還原與JSON／附件關聯 |
+| UI與時區 | 桌面／手機、台北輸入與顯示、非台北瀏覽器、秒數往返 |
+| 通知 | 正式只查notification，check409；不把demo模擬成功當真通知寄送 |
 
-## 實際執行結果
+## 2. 測試入口
 
-- `npm run test:api`：13 組整合測試全部通過，使用獨立暫存資料庫。
-- `npm run build`：TypeScript 檢查與 Vite 建置通過。
-- `npm run test:browser`：桌面完整流程通過，瀏覽器時區設為 America/Los_Angeles。
-- `AMS_TEST_MOBILE=1 npm run test:browser`：390 × 844 手機完整流程通過，同樣測試非台北瀏覽器時區。
-- 兩次瀏覽器執行都實際完成 A → B 出發／抵達 → C 出發／抵達，里程 100 → 120 → 130 → 155，總里程 55.0 km。
-- 還車照片實際上傳，完成後從 API 確認仍保存於 `interior_files`。
-- B 表內容修訂後仍保持完成狀態；全部管理頁、Beacon `000b` → major 11、手機唯讀限制與抽屜切頁均通過。
-- 瀏覽器未捕捉到未處理的頁面 JavaScript 例外。
+```bash
+npm run check
+npm run build
+.venv/bin/python tests/test_sso.py
+.venv/bin/python tests/test_standalone.py
+.venv/bin/python tests/test_manual_people.py
+.venv/bin/python tests/test_retention.py
+```
 
-測試碼：`tests/test_integration.py`、`tests/browser.mjs`。Chromium 使用使用者快取中的本地函式庫，執行方式見 README。`test-results/` 存放桌面與手機截圖，已排除版本控制。
+retention需要PG16與PostGIS，在/tmp臨時叢集驗證；不讀正式帳密。SSO測試模擬上游，不能替代公司真帳號。test_standalone驗設定與搬移，不等於完成另一主機部署。
 
-## 啟動與資料保留
+隔離demo流程與UI：
 
-服務已於本工作區啟動，監聽 `0.0.0.0:5174`。以下檢查皆回傳 HTTP 200：
+```bash
+npm run test:api
+npm run build
+npm run test:browser
+AMS_TEST_MOBILE=1 npm run test:browser
+node tests/browser_location.mjs
+```
 
-- `/api/health`：SQLite、本地測試模式。
-- `/`：首頁。
-- `/bookings/new/A`：SPA 深層網址。
+需Chromium與系統函式庫；browser_location使用mock定位。test_mysql.py僅舊相容測試，不要求啟MySQL部署。scripts/verify_postgresql_api.py用於指定PG庫只讀API驗收；LOCATION_BENCHMARK是效能比較，不是正確性或全端延遲驗收。
 
-啟動前備份：`/home/c113118138/polimax_backups/polimax_next-20260911-075140/`。
+## 3. 已有驗證紀錄
 
-升級後與備份逐表比對，原有 19 筆資源、7 張表單、7 筆占用、7 筆歷程、1 筆資產紀錄、1 筆登入資料均未遺失或修改；流水號因新增示範資料正常增加。原資料目錄為 `.data/`，後續備份須同時保留資料庫及附件。
+| 日期 | 紀錄範圍 |
+| --- | --- |
+| 2026-09-11 | SQLite demo 13組API整合、build、桌面／手機Playwright；完成四階段、附件與非台北瀏覽器時區驗證 |
+| 2026-09-22 | 正式PG遷移、兩入口health、SSO303跳轉、Nginx200、隔離還原與資料雜湊；跳轉不等於真帳號全程 |
+| 2026-09-24 | 20項隔離封存測試與雙庫備份；當時standalone曾有1項快照路徑失敗，不能稱全部檢查通過 |
+| 2026-09-30 | SSO9項、獨立部署4項通過；FindMy依賴與取報告測試，未異機還原全套 |
 
-重啟指令：先確認 5174 未被既有服務占用，再於專案目錄執行 `npm start`。這是工作區服務，不是開機自動啟動的系統服務。
+以上是原文件紀錄的歷史結果，不表示2026-10-05已重跑。本次修改文件沒有執行功能測試、正式登入、通知、部署或資料變更。
 
-## 驗證邊界
+## 4. 驗收邊界與待修項
 
-自動驗收涵蓋本次使用的 SQLite 與測試來源；沒有使用真實帳號、向真實收件人發送通知或聲稱企業整合已完成。MySQL 可配置，但本次沒有執行 MySQL 環境验收。E 儀器預約與規格第 16 節裁決屬本次補足，不含主管審批、ERP、部分數量庫存分配或未接入分析報表。
+- 定位UI保留部分測試文案，latest_report_time與updated_at顯示欄位仍未對齊。
+- 正式positions只含車輛；設備走Beacon/FindMy，沒有設備共用GPS軌跡。
+- 正式未提供自行寄通知、即時HR完整清單、外部權限自動同步、主管審批、ERP或部分數量庫存配置。
+- B/C刪除不自動回退父流程，測試須確認缺階段時行為，不應推定流程完整。
+- 歷史附件缺失以migration-report為準，不能用網站正常代替完整檔案验收。
+- 完整規格與需求見[PROJECT_SPEC](PROJECT_SPEC.md)、[業務欄位規格](../POLIMAX_原始_SPEC.md)。

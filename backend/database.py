@@ -26,7 +26,7 @@ def configuration(root: Path):
         return data, url, True
     required = ('MYSQL_HOST', 'MYSQL_DATABASE', 'MYSQL_USER', 'MYSQL_PASSWORD')
     if any(not values.get(key) for key in required):
-        raise RuntimeError('請在 polimax_next/env 設定 MYSQL_HOST、MYSQL_DATABASE、MYSQL_USER、MYSQL_PASSWORD')
+        raise RuntimeError('請在 polimax_refactor/env 設定 MYSQL_HOST、MYSQL_DATABASE、MYSQL_USER、MYSQL_PASSWORD')
     url = URL.create('mysql+pymysql', username=values['MYSQL_USER'],
                      password=values['MYSQL_PASSWORD'], host=values['MYSQL_HOST'],
                      port=int(values.get('MYSQL_PORT', '3306')),

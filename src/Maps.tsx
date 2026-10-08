@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { api, Resource, dateTime, localInput } from "./api";
 import { Empty, ErrorBox, Field, Loading, PageHead } from "./ui";
+const validPoint = (p: any) => Number.isFinite(p.lat) && Number.isFinite(p.lng);
 function Focus({ points }: { points: any[] }) {
   const map = useMap();
   useEffect(() => {
@@ -55,7 +56,9 @@ export function Positions() {
     }),
     positions = useQuery({
       queryKey: ["positions"],
-      queryFn: () => api<any[]>("/positions"),
+      queryFn: () =>
+        api<any[]>("/positions"),
+      staleTime: 0,
     });
   const [selected, setSelected] = useState(Number(params.get("resource")) || 0),
     [mode, setMode] = useState(params.get("start") ? "history" : "latest"),
@@ -79,7 +82,7 @@ export function Positions() {
     position = positions.data?.find((p) => p.resource_id === selected),
     shown =
       mode === "history"
-        ? points
+        ? points.filter(validPoint)
         : position && position.lat != null && position.lng != null
           ? [position]
           : [];
@@ -183,11 +186,10 @@ export function Positions() {
                   className={
                     "map-resource " + (selected === r.id ? "active" : "")
                   }
+                  disabled={busy}
                   onClick={() => {
                     setSelected(r.id);
-                    setPoints([]);
-                    setSearched(false);
-                    setError("");
+                    clearHistory();
                     if (r.kind !== "vehicle") setMode("latest");
                   }}
                 >
@@ -216,6 +218,7 @@ export function Positions() {
           <div className="list-tabs">
             <button
               className={mode === "latest" ? "active" : ""}
+              disabled={busy}
               onClick={() => {
                 setMode("latest");
                 setError("");
@@ -225,10 +228,10 @@ export function Positions() {
             </button>
             <button
               className={mode === "history" ? "active" : ""}
+              disabled={busy}
               onClick={() => {
                 setMode("history");
-                setPoints([]);
-                setSearched(false);
+                clearHistory();
               }}
             >
               車輛歷史軌跡
@@ -332,16 +335,28 @@ export function Positions() {
                   </Popup>
                 </CircleMarker>
               ))}
-              {shown.length > 1 && (
-                <Polyline
-                  positions={shown.map((p) => [p.lat, p.lng])}
-                  pathOptions={{
-                    color: "#388976",
-                    weight: 3,
-                    dashArray: "6 7",
-                  }}
-                />
-              )}
+              {mode === "history" &&
+                points
+                  .reduce<any[][]>(
+                    (segments, p) => {
+                      if (!validPoint(p)) segments.push([]);
+                      else segments[segments.length - 1].push(p);
+                      return segments;
+                    },
+                    [[]],
+                  )
+                  .filter((segment) => segment.length > 1)
+                  .map((segment, i) => (
+                    <Polyline
+                      key={i}
+                      positions={segment.map((p) => [p.lat, p.lng])}
+                      pathOptions={{
+                        color: "#388976",
+                        weight: 3,
+                        dashArray: "6 7",
+                      }}
+                    />
+                  ))}
               <Focus points={shown} />
             </MapContainer>
             {!selected && (
@@ -389,6 +404,12 @@ export function Positions() {
             points.length === 0 && (
               <Empty title="查詢無結果" description="請調整搜尋條件後重試。" />
             )}
+          {mode === "history" && points.some((p) => !validPoint(p)) && (
+            <div className="info-note">
+              {points.filter((p) => !validPoint(p)).length}{" "}
+              筆記錄無座標，未顯示於地圖。
+            </div>
+          )}
           {mode === "history" && points.length > 0 && (
             <div className="trajectory-results">
               <strong>共 {points.length} 個測試位置點</strong>
@@ -552,10 +573,13 @@ export function FindMy() {
     [search, setSearch] = useState("");
   const report = useQuery({
     queryKey: ["findmy", id],
-    queryFn: () => api<any>("/findmy/" + encodeURIComponent(id)),
+    queryFn: () =>
+      api("/findmy/" + encodeURIComponent(id)),
+    staleTime: 0,
     enabled: !!id,
   });
-  const points = report.data?.points?.slice(0, 1) || [];
+  const reportData = report.data;
+  const points = reportData?.points?.slice(0, 1) || [];
   return (
     <>
       <PageHead
@@ -606,8 +630,7 @@ export function FindMy() {
         ) : points.length ? (
           <>
             <p>
-              {report.data.beacon.owner} · {id} → major{" "}
-              {report.data.beacon.major}
+              {reportData.beacon.owner} · {id} → major {reportData.beacon.major}
             </p>
             <p>
               位置時間：{dateTime(points[0].time)} · 接收時間：
@@ -625,7 +648,7 @@ export function FindMy() {
                 />
                 <CircleMarker center={[points[0].lat, points[0].lng]}>
                   <Popup>
-                    {report.data.beacon.owner}
+                    {reportData.beacon.owner}
                     <br />
                     {dateTime(points[0].time)}
                   </Popup>

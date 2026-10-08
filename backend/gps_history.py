@@ -2,12 +2,18 @@
 from sqlalchemy import select, func, or_
 
 
+def position_columns(table):
+    """Read latitude and longitude directly from their numeric columns."""
+    columns = [table.c[name] for name in ('id', 'record_time', 'created_at', 'timestamp') if name in table.c]
+    return columns + [table.c.latitude, table.c.longitude]
+
+
 def trajectory_rows(connection, table, client_id, start, end, limit):
     valid = (table.c.client_id == client_id, table.c.created_at >= start,
              table.c.created_at < end, table.c.latitude.between(-90, 90),
              table.c.longitude.between(-180, 180), func.abs(table.c.latitude) > 0.001,
              func.abs(table.c.longitude) > 0.001)
-    ranked = select(table, func.row_number().over(order_by=(table.c.created_at, table.c.id)).label('_n'),
+    ranked = select(*position_columns(table), func.row_number().over(order_by=(table.c.created_at, table.c.id)).label('_n'),
                     func.count().over().label('_total')).where(*valid).subquery()
     stride = func.ceil((ranked.c._total - 1) / (limit - 1))
     query = select(ranked).where(or_(ranked.c._total <= limit,

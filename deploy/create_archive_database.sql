@@ -1,5 +1,5 @@
 -- Run once on 163.18.26.228 as the local PostgreSQL administrator:
--- sudo -u postgres psql -X -v ON_ERROR_STOP=1 < /home/c113118138/polimax_next/deploy/create_archive_database.sql
+-- sudo -u postgres psql -X -v ON_ERROR_STOP=1 < /home/c113118138/polimax_refactor/deploy/create_archive_database.sql
 -- No password is embedded. Does not change the source database or delete data.
 \set ON_ERROR_STOP on
 SELECT format('CREATE DATABASE %I OWNER %I TEMPLATE template0 ENCODING %L',

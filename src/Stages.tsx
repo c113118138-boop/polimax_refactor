@@ -20,7 +20,7 @@ import {
   Modal,
   PageHead,
 } from "./ui";
-import { can, bookingDoc, Scope } from "./Access";
+import { can, canFillDeparture, bookingDoc, Scope } from "./Access";
 import { useUser } from "./App";
 const checksB = [
   "擋風玻璃清潔",
@@ -540,7 +540,7 @@ export function StageForm({
             >
               取消
             </button>
-            <button className="button primary" disabled={busy}>
+            <button className="button primary" disabled={busy || (kind === "B" && !canFillDeparture(u, b))}>
               {busy ? "保存中…" : "確認提交本階段"}
             </button>
           </div>
@@ -594,7 +594,7 @@ export function StagePage() {
         description="修正保留編號及舊版本，父單流程不倒退。"
         action={
           <div className="actions">
-            {can(u, bookingDoc(s.kind), "write") && (
+            {can(u, bookingDoc(s.kind), "write") && (s.kind !== "B" || canFillDeparture(u, { owner: s.applicant_owner })) && (
               <button
                 className="button"
                 onClick={() => {
@@ -605,7 +605,7 @@ export function StagePage() {
                 修正階段內容
               </button>
             )}
-            {can(u, bookingDoc(s.kind), "delete") && (
+            {can(u, bookingDoc(s.kind), "delete") && (s.kind !== "B" || canFillDeparture(u, { owner: s.applicant_owner })) && (
               <button className="button danger" onClick={() => setRemove(true)}>
                 刪除階段
               </button>

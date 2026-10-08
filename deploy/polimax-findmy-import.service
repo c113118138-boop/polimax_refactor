@@ -2,12 +2,12 @@
 Description=Import Apple FindMy location reports into POLIMAX PostgreSQL
 Wants=network-online.target
 After=network-online.target
-ConditionPathExists=%h/polimax_next/.data/findmy/account.json
+ConditionPathExists=%h/polimax_refactor/.data/findmy/account.json
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/polimax_next
-ExecStart=%h/polimax_next/.venv-findmy/bin/python %h/polimax_next/integrations/findmy/findmyupdate.py
+WorkingDirectory=%h/polimax_refactor
+ExecStart=%h/polimax_refactor/.venv-findmy/bin/python %h/polimax_refactor/integrations/findmy/findmyupdate.py
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true

@@ -136,6 +136,11 @@ class ArchiveTests(unittest.TestCase):
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
         from legacy_integrations import install
+        with self.source.begin() as c:
+            c.exec_driver_sql('CREATE TABLE "BeaconList" (id text PRIMARY KEY, owner text, programmed text, "BLEMacAddr" text)')
+            c.exec_driver_sql("INSERT INTO \"BeaconList\" VALUES ('000b', 'test beacon', 'y', '')")
+            c.exec_driver_sql('ALTER TABLE new_reports ADD COLUMN sheet_id text, ADD COLUMN timestamp timestamp, ADD COLUMN created_at timestamp')
+            c.execute(text("INSERT INTO new_reports (id, sheet_id, latitude, longitude, timestamp, created_at) VALUES (1,'000b',25.25,121.75,:stamp,:stamp)"), {'stamp': self.recent})
         resource = {'id': 1, 'kind': 'vehicle', 'label': 'test', 'client_id': 'device'}
         @contextmanager
         def session():
@@ -152,6 +157,27 @@ class ArchiveTests(unittest.TestCase):
                 'end': (self.recent+timedelta(days=1)).isoformat()})
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()['points'][0]['lng'], 121.5)
+            params = {'start': (self.recent-timedelta(days=1)).isoformat(),
+                      'end': (self.recent+timedelta(days=1)).isoformat()}
+            # Different spatial values must not affect numeric-column queries.
+            with self.source.begin() as c:
+                c.exec_driver_sql('ALTER TABLE gps_readings DISABLE TRIGGER polimax_sync_location')
+                c.exec_driver_sql('UPDATE gps_readings SET location=ST_SetSRID(ST_MakePoint(122,26),4326)::geography WHERE id=3')
+            latest = client.get('/api/positions').json()[0]
+            self.assertEqual((latest['lat'], latest['lng']), (25.12345678, 121.5))
+            self.assertNotIn('coordinate_source', latest)
+            self.assertEqual(client.get('/api/trajectory/1', params=params).json()['points'], response.json()['points'])
+            with self.source.begin() as c:
+                c.exec_driver_sql('UPDATE gps_readings SET location=NULL WHERE id=3')
+                c.exec_driver_sql('ALTER TABLE new_reports DISABLE TRIGGER polimax_sync_location')
+                c.exec_driver_sql('UPDATE new_reports SET location=NULL')
+            self.assertEqual(client.get('/api/positions').json()[0]['lng'], 121.5)
+            self.assertEqual(client.get('/api/trajectory/1', params=params).json()['points'], response.json()['points'])
+            beacon = client.get('/api/findmy/000b').json()
+            self.assertEqual((beacon['points'][0]['lat'], beacon['points'][0]['lng']), (25.25, 121.75))
+            with self.source.begin() as c:
+                c.exec_driver_sql('ALTER TABLE gps_readings ENABLE TRIGGER polimax_sync_location')
+                c.exec_driver_sql('UPDATE gps_readings SET longitude=longitude WHERE id=3')
         self.run_archive(['gps_readings'])
         self.assertEqual([row['id'] for row in self.rows(self.source, 'gps_readings')], [3, 4, 5])
         archived = self.rows(self.target, 'gps_readings')

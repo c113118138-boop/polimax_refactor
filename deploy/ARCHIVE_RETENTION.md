@@ -1,5 +1,9 @@
 # PostgreSQL 歷史封存與清理
 
+> 專案名稱與路徑更新：2026-10-07。專案名稱為 `polimax_refactor`，本機目錄為 `/home/c113118138/polimax_refactor`。
+
+> 更新：2026-10-05。現行正式架構為 PostgreSQL／PostGIS + FastAPI + React + 公司 SSO。文件更新依程式與部署紀錄核對，未重新執行正式環境驗收。
+
 正式庫：`polimax_PostgreSQL`。封存庫：`polimax_PostgreSQL_Expired`。
 兩者位於 163.18.26.228 的同一個 PostgreSQL instance，沿用本機
 `127.0.0.1` 連線及既有帳號，不增加對外開放的連接埠。
@@ -85,7 +89,7 @@ systemctl --user enable --now polimax-gps-cleanup.timer polimax-pg-backup.timer
 ```
 
 沿用每天 03:30 清理、04:00 完整備份。舊 `gps_maintenance.py` 已轉接新流程，
-不會退回直接刪除；舊 `--ensure-indexes` 選項不再使用。
+不會退回直接刪除，也不提供索引建立旗標。
 暫停封存只需停用 `polimax-gps-cleanup.timer`，保留完整備份排程與
 `AMS_ARCHIVE_ENABLED=1`，確保已有封存資料繼續備份。
 
@@ -117,7 +121,7 @@ npm run build
 
 測試建立並移除 `/tmp` 下 Unix socket PostgreSQL 叢集，完全不讀正式帳密。
 
-## 2026-09-24 正式啟用紀錄
+## 2026-09-24 已記錄啟用結果（不是本次驗收）
 
 - 使用者以 PostgreSQL 管理員建立 `polimax_PostgreSQL_Expired`，完成初始化與 `.env` 啟用設定。
 - 20 項封存隔離測試通過，包含續跑游標、當機重跑、內容衝突、主檔保留、權限、分塊附件、雙庫備份與還原；前端建置通過。
@@ -126,3 +130,11 @@ npm run build
 - 網站 5173／5174 重啟後 health 正常，封存 API 已載入且未登入請求回應 401。
 - 首輪正式清理成功，搬移與刪除均為 0 筆。39 份舊表單因缺少 JSON 或附件而保留，其餘資料未符合完整封存條件。
 - 每日清理與雙庫備份排程已啟用：台北時間 03:30 及 04:00。續跑游標已初始化並於正式庫驗證。
+
+## 目前備份覆蓋範圍與一致性
+
+backup_postgresql.py打包專案固定`.data/responses`、`.data/files`、`.data/permissions`、`.data/findmy`與`env`／`.env`，不打包sso/session。自訂AMS_DATA_DIR、AMS_RESPONSES_DIR或外部政策路徑時，應另行包含實際資料，核對tar清單後才視為完整。
+
+網站／封存／備份共用應用advisory lock；PMX與FindMy等外部寫入者不保證使用相同鎖，所以完整跨系統還原點要停所有寫入者。04:00備份timer沒有顯式時區，依主機時區執行；03:30清理timer則明定Asia/Taipei。停timer不會取消已在執行的oneshot，維護窗口另須確認作業結束。
+
+現行MySQL已不作正式資料庫；封存與雙庫備份僅PostgreSQL。操作順序見[回復手冊](../POSTGRESQL_CUTOVER_RUNBOOK.md)。本次文件更新未執行初始化、清理或還原。

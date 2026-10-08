@@ -1,6 +1,6 @@
 """Read the existing tracking tables; keep external import/notification jobs separate."""
 from datetime import timedelta
-from gps_history import trajectory_rows
+from gps_history import trajectory_rows, position_columns
 import json
 import os
 from pathlib import Path
@@ -64,11 +64,12 @@ def install(app,store,current,check):
         check(user,'CarUpdate','read');result=[]
         with store().session() as repo:
             t=table(repo,'gps_readings')
+            columns=position_columns(t) if t is not None else []
             for r in repo.resources():
                 if r['kind']!='vehicle':continue
                 row=None
                 if t is not None and r.get('client_id'):
-                    row=repo.c.execute(select(t).where(t.c.client_id==r['client_id']).order_by(t.c.record_time.desc(),t.c.id.desc()).limit(1)).mappings().first()
+                    row=repo.c.execute(select(*columns).where(t.c.client_id==r['client_id']).order_by(t.c.record_time.desc(),t.c.id.desc()).limit(1)).mappings().first()
                 result.append({'resource_id':r['id'],'label':r['label'],'source':'gps','position_source':'gps','test_data':False,
                     'lat':None,'lng':None,**(point(row) or {}),'latest_report_time':iso(row.get('created_at')) if row else None,'missing':not bool(row)})
         return result
@@ -92,7 +93,7 @@ def install(app,store,current,check):
             beacon=next((b for b in beacons(repo) if b['id']==ident),None)
             if not beacon:fail('找不到 Beacon',404)
             t=table(repo,'new_reports');row=None
-            if t is not None:row=repo.c.execute(select(t).where(t.c.sheet_id==ident).order_by(t.c.timestamp.desc(),t.c.id.desc()).limit(1)).mappings().first()
+            if t is not None:row=repo.c.execute(select(*position_columns(t)).where(t.c.sheet_id==ident).order_by(t.c.timestamp.desc(),t.c.id.desc()).limit(1)).mappings().first()
             position=point(row)
             return {**beacon,'beacon':beacon,'points':[position] if position and position['lat'] is not None and position['lng'] is not None else [],'point':position,'position':position,'latest':position,'test_data':False,**(position or {'lat':None,'lng':None})}
     @app.get('/api/stations')

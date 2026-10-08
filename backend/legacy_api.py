@@ -63,7 +63,14 @@ def create_app(root,data,url):
                 yield
         finally:
             engine.dispose()
-    app=FastAPI(title='POLIMAX API',lifespan=lifespan)
+    def require_workspace_access(request:Request):
+        public={'/api/health','/api/auth/config','/api/auth/me','/api/auth/login','/api/auth/logout',
+                '/api/auth/sso','/api/SSO','/api/Login','/api/callback','/api/auth/sso/callback'}
+        if request.url.path.startswith('/api/') and request.url.path not in public:
+            user=current(request)
+            if not any(value for ops in user['permissions']['forms'].values() for value in ops.values()):
+                fail('沒有權限',403)
+    app=FastAPI(title='POLIMAX API',lifespan=lifespan,dependencies=[Depends(require_workspace_access)])
     app.state.engine=engine
     app.state.sso=sso
     if not test_auth:sso.install(app)
@@ -182,7 +189,7 @@ def create_app(root,data,url):
     @app.get('/api/bookings')
     def bookings(user=Depends(current)):
         with store().session() as repo:result=repo.bookings()
-        return [redact(user,permissions.KINDS[r['kind']],r) for r in result if user['permissions']['forms'][permissions.KINDS[r['kind']]]['read']]
+        return [redact(user,permissions.KINDS[r['kind']],r) if permissions.can_view_booking_detail(user,r) else permissions.booking_summary(r) for r in result if user['permissions']['forms'][permissions.KINDS[r['kind']]]['read']]
     @app.post('/api/bookings/check')
     def check_booking(body:BookingInput,user=Depends(current)):
         check(user,permissions.KINDS.get(body.kind,'Lending_form'),'create')
@@ -196,44 +203,58 @@ def create_app(root,data,url):
     @app.get('/api/bookings/{fid}')
     def booking(fid:str,user=Depends(current)):
         with store().session() as repo:
+            permissions.require_booking_detail(user,repo.booking(fid))
             result=repo.detail(fid);doc=permissions.KINDS[result['kind']];check(user,doc,'read',owner=result['owner'])
         return redact(user,doc,result)
     @app.put('/api/bookings/{fid}')
     def edit_booking(fid:str,body:BookingInput,user=Depends(current)):
         with store().session(True) as repo:
-            old=repo.booking(fid);check(user,permissions.KINDS[old['kind']],'write',body=body.content,old=old['content'],owner=old['owner'])
+            old=repo.booking(fid);permissions.require_booking_detail(user,old);check(user,permissions.KINDS[old['kind']],'write',body=body.content,old=old['content'],owner=old['owner'])
             result=repo.save_booking(body.model_dump(),user,fid)
         return result
     @app.delete('/api/bookings/{fid}')
     def delete_booking(fid:str,user=Depends(current)):
         with store().session(True) as repo:
-            old=repo.booking(fid);check(user,permissions.KINDS[old['kind']],'delete',owner=old['owner']);repo.delete_booking(fid)
+            old=repo.booking(fid);permissions.require_booking_detail(user,old);check(user,permissions.KINDS[old['kind']],'delete',owner=old['owner']);repo.delete_booking(fid)
         return {'ok':True}
     @app.post('/api/bookings/{fid}/advance')
     def advance(fid:str,body:StageInput,user=Depends(current)):
         with store().session(True) as repo:
             old=repo.booking(fid);doc={'PENDING':'departure_form','DEPARTURE':'departure_arrive','DEPARTURE_ARRIVED':'back_form','RETURN':'back_arrive'}.get(old['status'],'back_arrive')
+            permissions.require_booking_detail(user,old)
+            if doc in ('departure_form','departure_arrive'):permissions.require_departure_owner(user,old)
             check(user,doc,'write' if old['status'] in ('DEPARTURE','RETURN') else 'create',owner=old['owner'])
             result=repo.advance(fid,body.model_dump(),user)
         return result
     @app.get('/api/stages')
     def stages(kind:str='B',user=Depends(current)):
         doc=permissions.KINDS.get(kind,'departure_form');check(user,doc,'read')
-        with store().session() as repo:result=repo.stages(kind)
+        with store().session() as repo:
+            result=repo.stages(kind)
+            if '工程人員' in user['permissions'].get('roles',[]):
+                result=[stage for stage in result if permissions.can_view_booking_detail(user,{'owner':stage.get('applicant_owner')})]
         return redact(user,doc,result)
     @app.get('/api/stages/{fid}')
     def stage(fid:str,user=Depends(current)):
-        with store().session() as repo:result=repo.stage(fid)
+        with store().session() as repo:
+            result=repo.stage(fid)
+            permissions.require_booking_detail(user,repo.booking(result['parent_id'],True) if result.get('parent_id') else {'owner':result.get('applicant_owner')})
         doc=permissions.KINDS[result['kind']];check(user,doc,'read');return redact(user,doc,result)
     @app.put('/api/stages/{fid}')
     def edit_stage(fid:str,body:EditStage,user=Depends(current)):
         with store().session(True) as repo:
-            old=repo.stage(fid);check(user,permissions.KINDS[old['kind']],'write',body=body.content,old=old['content'],owner=old['owner']);result=repo.edit_stage(fid,body.model_dump(),user)
+            old=repo.stage(fid)
+            permissions.require_booking_detail(user,repo.booking(old['parent_id'],True) if old.get('parent_id') else {'owner':old.get('applicant_owner')})
+            if old['kind']=='B':permissions.require_departure_owner(user,repo.booking(old['parent_id'],True) if old.get('parent_id') else {'owner':old.get('applicant_owner')})
+            check(user,permissions.KINDS[old['kind']],'write',body=body.content,old=old['content'],owner=old['owner']);result=repo.edit_stage(fid,body.model_dump(),user)
         return result
     @app.delete('/api/stages/{fid}')
     def delete_stage(fid:str,user=Depends(current)):
         with store().session(True) as repo:
-            old=repo.stage(fid);check(user,permissions.KINDS[old['kind']],'delete',owner=old['owner']);raw=repo.raw(fid);raw['is_deleted']=True;repo.save_json(fid,raw)
+            old=repo.stage(fid)
+            permissions.require_booking_detail(user,repo.booking(old['parent_id'],True) if old.get('parent_id') else {'owner':old.get('applicant_owner')})
+            if old['kind']=='B':permissions.require_departure_owner(user,repo.booking(old['parent_id'],True) if old.get('parent_id') else {'owner':old.get('applicant_owner')})
+            check(user,permissions.KINDS[old['kind']],'delete',owner=old['owner']);raw=repo.raw(fid);raw['is_deleted']=True;repo.save_json(fid,raw)
         return {'ok':True}
     @app.post('/api/files')
     async def upload(request:Request,user=Depends(current)):

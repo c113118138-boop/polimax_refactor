@@ -12,7 +12,7 @@ for unit in polimax-next@5173.service polimax-next@5174.service \
         exit 2
     fi
 done
-root=/home/c113118138/polimax_next
+root=/home/c113118138/polimax_refactor
 backup_parent=/home/c113118138/migration_backups
 mkdir -p -m 700 "$backup_parent"
 backup_dir="$backup_parent/cutover-$(date +%Y%m%d-%H%M%S)"

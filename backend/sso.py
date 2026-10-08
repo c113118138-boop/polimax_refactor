@@ -146,6 +146,9 @@ class SSO:
             if not ident:raise ValueError()
             return {'id':str(ident),'name':str(data.get('name') or data.get('full_name') or data.get('username') or data.get('email') or ident),'email':str(data.get('email') or ''),'username':str(data.get('username') or '')}
         except (httpx.HTTPError,ValueError,TypeError):raise HTTPException(502,'無法取得 SSO 使用者資料')
+    def no_access(self,identity,version):
+        policy={'module':'AMS','version':version,'roles':{},'user_roles':{},'ui':{}}
+        return {**identity,'role':'','role_label':'無權限','permissions':permissions.effective_policy(policy,identity),'auth_source':'sso'}
     def with_permissions(self,identity):
         config=self.config
         if config.get('AMS_POLICY_FILE'):
@@ -164,8 +167,13 @@ class SSO:
             except (OSError,ValueError,KeyError,TypeError):raise HTTPException(503,'原 AMS 權限快照無法讀取')
             aliases={identity['id'],identity['email'],identity.get('username','')}-{''}
             enabled_users={str(u['name']):u for u in source.get('users',[]) if enabled(u.get('enabled',0))}
+            # Email spelling may differ between the IdP and the AMS snapshot.
+            # Keep opaque subject IDs case-sensitive and preserve snapshot keys
+            # for role and per-user restriction lookup.
             matches=aliases & enabled_users.keys()
-            if not matches:raise HTTPException(403,'此 SSO 帳號尚未在 AMS 啟用')
+            email_aliases={key.casefold() for key in aliases if '@' in key}
+            matches.update(key for key in enabled_users if '@' in key and key.casefold() in email_aliases)
+            if len(matches)!=1:return self.no_access(identity,snapshot['meta']['version'])
             active={r['name'] for r in source.get('roles',[]) if enabled(r.get('activate',0))}
             roles=list(dict.fromkeys(r['role'] for r in source.get('userRoles',[]) if r['user'] in matches and r['role'] in active))
             policy={'module':'AMS','version':snapshot['meta']['version'],'roles':{},'user_roles':{identity['id']:roles},'ui':{}}
@@ -187,11 +195,11 @@ class SSO:
                 policy['ui'][role]={str(r['component_id']):r['permission_state'] for r in source.get('uiPermissions',[]) if r.get('rolename')==role and r.get('module')=='AMS'}
             # Existing user restrictions cannot be silently widened by the adapter.
             if any(str(row.get('user','')) in matches for row in source.get('userPermissions',[])):
-                raise HTTPException(403,'此帳號含個別資料限制，請先完成 AMS 限制設定對應')
+                return self.no_access(identity,snapshot['meta']['version'])
             if identity['name'] in aliases:
                 identity={**identity,'name':next((enabled_users[k].get('full_name') for k in matches if enabled_users[k].get('full_name')),identity['name'])}
         effective=permissions.effective_policy(policy,identity)
-        return {**identity,'role':','.join(effective['roles']),'role_label':'、'.join(effective['roles']) or '未授權','permissions':effective,'auth_source':'sso'}
+        return {**identity,'role':','.join(effective['roles']),'role_label':'、'.join(effective['roles']) or '無權限','permissions':effective,'auth_source':'sso'}
     def callback_response(self,request,code=None,state=None,error=None):
         try:
             expected=request.cookies.get(self.state_cookie,'')
@@ -256,9 +264,17 @@ class SSO:
         @app.get('/api/auth/sso')
         @app.get('/api/SSO')
         @app.get('/api/Login')
-        def start(request:Request,return_to:str='/'):
+        def start(request:Request,return_to:str='/',retry:bool=False):
             if request.url.hostname != urlsplit(self.public).hostname:
-                return RedirectResponse(self.public+'/api/auth/sso?'+urlencode({'return_to':safe_return(return_to)}),status_code=303)
+                return RedirectResponse(self.public+'/api/auth/sso?'+urlencode({'return_to':safe_return(return_to),'retry':int(retry)}),status_code=303)
+            if retry:
+                # Clear the IdP domain cookie in the browser before authorizing
+                # again; an AMS callback failure does not log out of the IdP.
+                entry=self.public+'/api/auth/sso?'+urlencode({'return_to':safe_return(return_to)})
+                response=RedirectResponse(self.server+'/logout?'+urlencode({'redirect_uri':entry,'client_id':self.client_id}),status_code=303)
+                self.logout(request,response)
+                response.headers['Cache-Control']='no-store'
+                return response
             return self.start(return_to)
         @app.get('/api/callback')
         @app.get('/api/auth/sso/callback')

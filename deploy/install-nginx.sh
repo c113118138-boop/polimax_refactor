@@ -14,7 +14,7 @@ fi
 restore_config() {
     if [[ -n "$backup" ]]; then cp -p -- "$backup" "$target"; else rm -f -- "$target"; fi
 }
-install -m 0644 -- "$config_dir/polimax-next.conf" "$target"
+install -m 0644 -- "$config_dir/polimax-refactor.conf" "$target"
 if ! nginx -t; then
     restore_config
     echo '設定檢查失敗，已還原；未重新載入 Nginx。' >&2

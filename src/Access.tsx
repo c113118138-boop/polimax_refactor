@@ -5,6 +5,15 @@ export const AccessScope = createContext("Lending_form");
 export function can(u: any, doc: string, op = "read") {
   return !!u?.permissions?.forms?.[doc]?.[op];
 }
+export function hasWorkspaceAccess(u: any) {
+  return Object.values(u?.permissions?.forms || {}).some((ops: any) => Object.values(ops).some(Boolean));
+}
+export function canFillDeparture(u: any, booking: any) {
+  if (u?.permissions?.roles?.some((role: string) => ["Admin", "admin"].includes(role))) return true;
+  const owner = String(booking?.owner || booking?.content?.applicant || "");
+  const aliases = [u?.id, u?.email, u?.username, u?.name].filter(Boolean);
+  return !!owner && aliases.some((alias: string) => alias === owner || (owner.includes("@") && alias.includes("@") && alias.toLowerCase() === owner.toLowerCase()));
+}
 export const bookingDoc = (kind: string) =>
   ({
     A: "Lending_form",

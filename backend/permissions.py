@@ -100,6 +100,30 @@ def require(u,doc,*ops):
     for op in ops:
         if not u['permissions']['forms'].get(doc,{}).get(op):raise HTTPException(403,f'權限不足：{doc} 缺少 {op}，請返回首頁')
 
+def can_fill_departure(u, booking):
+    if set(u['permissions'].get('roles', [])) & {'Admin', 'admin'}:
+        return True
+    owner = str(booking.get('owner') or booking.get('content', {}).get('applicant') or '')
+    aliases = {str(u.get(key) or '') for key in ('id', 'email', 'username', 'name')} - {''}
+    return bool(owner) and (owner in aliases or ('@' in owner and owner.casefold() in {key.casefold() for key in aliases if '@' in key}))
+
+def require_departure_owner(u, booking):
+    if not can_fill_departure(u, booking):
+        raise HTTPException(403, '只能填寫自己的發車表單；代填他人表單需要最高管理權限')
+
+def can_view_booking_detail(u, booking):
+    return '工程人員' not in u['permissions'].get('roles', []) or can_fill_departure(u, booking)
+
+def require_booking_detail(u, booking):
+    if not can_view_booking_detail(u, booking):
+        raise HTTPException(403, '無法修改他人借用紀錄')
+
+def booking_summary(booking):
+    return {**{key: booking.get(key) for key in ('id', 'kind', 'status', 'created_at', 'updated_at')},
+            'detail_allowed': False,
+            'content': {'applicant': booking.get('content', {}).get('applicant', ''), 'title': '借用紀錄'},
+            'slots': [{key: slot[key] for key in ('resource_id', 'start', 'end')} for slot in booking.get('slots', [])]}
+
 def redact(value,fields):
     if isinstance(value,list):return [redact(v,fields) for v in value]
     if isinstance(value,dict):return {k:redact(v,fields) for k,v in value.items() if fields.get(k,{}).get('read',1)}

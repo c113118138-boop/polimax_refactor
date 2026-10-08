@@ -461,6 +461,7 @@ class Repository:
         path=self.store.path(fid)
         stamp=iso(datetime.fromtimestamp(path.stat().st_mtime,TZ).replace(tzinfo=None)) if path.exists() else iso(now())
         return {'id':fid,'kind':kind,'parent_id':parent,'owner':raw.get('submitted_by') or raw.get('applicantID',''),
+            'applicant_owner':booking['owner'] if parent else raw.get('applicantID',''),
             'status':'PENDING','revision':fingerprint(raw),'content':content,'slots':[],
             'created_at':raw.get('submission_timestamp') or start.get('submitted_at') or stamp,'updated_at':stamp,
             'previous_id':None,'versions':[]}

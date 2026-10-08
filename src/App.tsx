@@ -36,7 +36,7 @@ import { Positions, Scans, FindMy } from "./Maps";
 import { StageList, StagePage } from "./Stages";
 import { Beacons, Integrations } from "./Admin";
 import Archive from "./Archive";
-import { Guard, can } from "./Access";
+import { Guard, can, hasWorkspaceAccess } from "./Access";
 const UserContext = createContext<User>(null!);
 export const useUser = () => useContext(UserContext);
 const nav = [
@@ -91,7 +91,9 @@ function Login() {
   async function login() {
     if (!demo) {
       const returnTo = window.location.pathname + (window.location.search.includes("sso_error") ? "" : window.location.search);
-      window.location.assign("/api/auth/sso?return_to=" + encodeURIComponent(returnTo));
+      setBusy(true);
+      const retry = new URLSearchParams(window.location.search).has("sso_error");
+      window.location.assign("/api/auth/sso?return_to=" + encodeURIComponent(returnTo) + (retry ? "&retry=1" : ""));
       return;
     }
     setBusy(true);
@@ -205,6 +207,7 @@ function Shell() {
   const u = useUser(),
     location = useLocation(),
     navigate = useNavigate();
+  const hasAccess = hasWorkspaceAccess(u);
   const archiveStatus = useQuery({
     queryKey: ["archive-status"],
     queryFn: () => api<{ enabled: boolean }>("/archive/status"),
@@ -341,7 +344,13 @@ function Shell() {
           </div>
         </header>
         <main>
-          <Routes>
+          {!hasAccess && location.pathname !== "/" ? (
+            <section className="panel detail-content">
+              <h2>沒有權限</h2>
+              <p>此帳號尚未取得 AMS 功能權限。</p>
+              <button className="button" onClick={() => navigate("/")}>返回首頁</button>
+            </section>
+          ) : <Routes>
             <Route path="/archive" element={<Guard doc="Administration"><Archive /></Guard>} />
             <Route
               path="/"
@@ -433,7 +442,7 @@ function Shell() {
               }
             />
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          </Routes>}
         </main>
         <footer className="app-footer">
           <span>POLIMAX · 讓資源管理更有條理</span>

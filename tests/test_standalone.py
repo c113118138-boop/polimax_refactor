@@ -48,7 +48,10 @@ class StandaloneTests(unittest.TestCase):
             self.assertFalse(user['permissions']['forms']['Lending_form']['write'])
             payload['data']['users'][0]['enabled']=False
             (folder/'snapshot.json').write_text(json.dumps(payload))
-            with self.assertRaises(HTTPException):sso.with_permissions(identity)
+            user=sso.with_permissions(identity)
+            self.assertEqual(user['role_label'],'無權限')
+            self.assertEqual(user['permissions']['roles'],[])
+            self.assertFalse(any(value for ops in user['permissions']['forms'].values() for value in ops.values()))
     def test_copy_is_repeatable_but_never_overwrites_changes(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);source=root/'source';target=root/'destination'

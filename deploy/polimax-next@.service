@@ -4,8 +4,8 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-WorkingDirectory=/home/c113118138/polimax_next
-ExecStart=/home/c113118138/polimax_next/.venv/bin/python -m uvicorn app:app --app-dir /home/c113118138/polimax_next/backend --host 0.0.0.0 --port %i
+WorkingDirectory=/home/c113118138/polimax_refactor
+ExecStart=/home/c113118138/polimax_refactor/.venv/bin/python -m uvicorn app:app --app-dir /home/c113118138/polimax_refactor/backend --host 0.0.0.0 --port %i
 Environment=PYTHONUNBUFFERED=1
 Restart=always
 RestartSec=5
