@@ -1,4 +1,4 @@
-import { ReactNode, useState, Children, isValidElement } from "react";
+import { ReactNode, useState, useId, Children, isValidElement } from "react";
 import { Dialog } from "@mui/material";
 import {
   AlertCircle,
@@ -81,23 +81,28 @@ export function Modal({
   title,
   children,
   wide = false,
+  className = "",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   wide?: boolean;
+  className?: string;
 }) {
+  const titleId = useId();
   return (
     <Dialog
       open={open}
       onClose={onClose}
+      aria-labelledby={titleId}
       maxWidth={wide ? "md" : "sm"}
       fullWidth
+      className={className}
       PaperProps={{ className: "modal-paper" }}
     >
       <div className="modal-head">
-        <h2>{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         <button className="icon-button" onClick={onClose} aria-label="關閉">
           <X size={20} />
         </button>
@@ -186,17 +191,20 @@ export function FileUpload({
   onChange,
   readOnly = false,
   images = false,
+  onBusyChange,
 }: {
   value: any[];
   onChange: (v: any[]) => void;
   readOnly?: boolean;
   images?: boolean;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   async function upload(files: FileList | null) {
     if (!files) return;
     setBusy(true);
+    onBusyChange?.(true);
     setError("");
     const next = [...value];
     let failures: string[] = [];
@@ -222,6 +230,7 @@ export function FileUpload({
     onChange(next);
     setError(failures.join("；"));
     setBusy(false);
+    onBusyChange?.(false);
   }
   return (
     <div className="attachments">
@@ -263,6 +272,13 @@ export function FileUpload({
             >
               <ArrowUpRight size={17} />
             </a>
+          )}
+          {images && file.mime?.startsWith("image/") && (
+            <img
+              src={"/api/files/" + file.id + "?preview=true"}
+              alt={file.name}
+              loading="lazy"
+            />
           )}
           {!readOnly && (
             <button

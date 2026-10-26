@@ -1,0 +1,28 @@
+{
+  "captured_at": "2026-10-10T00:30:51.208967+08:00",
+  "requirements": "CODEX_XHIGH_HANDOFF.md overrides historical defects in source snapshots",
+  "original_ABCDE_rendered_pages_verified": false,
+  "artifacts": [
+    {
+      "original_path": "/home/c113118138/FUNCTIONAL_SPEC.md",
+      "project_relative_path": "docs/reconstruction/source/FUNCTIONAL_SPEC.md",
+      "bytes": 4963473,
+      "sha256": "2c7887b2c2e7822f2df61cc9aaa09e9644de1d9cf79d21ecf40fdfa039770fe2",
+      "kind": "unchanged_source_snapshot"
+    },
+    {
+      "original_path": "/home/c113118138/SPEC_UNCONFIRMED.md",
+      "project_relative_path": "docs/reconstruction/source/SPEC_UNCONFIRMED.md",
+      "bytes": 8426,
+      "sha256": "8eb3952f0e648e4c719489c82c5d83857d58575753a0ed58a1abb0a3b1bfd2af",
+      "kind": "unchanged_source_snapshot"
+    },
+    {
+      "original_path": "/tmp/polimax-formio-css-reference-probe.png",
+      "project_relative_path": "docs/reconstruction/reference-style-probe.png",
+      "bytes": 23329,
+      "sha256": "16bdb517e750a73a5ab3136fcf9fb18dfa1a35f583a82056824017a58dd8bded",
+      "kind": "reference_css_probe_not_original_forms"
+    }
+  ]
+}

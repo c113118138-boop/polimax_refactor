@@ -1,4 +1,5 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import FullCalendar from "@fullcalendar/react";
@@ -7,69 +8,129 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import listPlugin from "@fullcalendar/list";
 import interactionPlugin from "@fullcalendar/interaction";
 import luxonPlugin from "@fullcalendar/luxon3";
-import { can, hasWorkspaceAccess } from "./Access";
+import zhTwLocale from "@fullcalendar/core/locales/zh-tw";
+import { can, hasWorkspaceAccess, bookingDoc } from "./Access";
 import {
   ArrowRight,
-  ArrowUpRight,
-  CalendarDays,
-  CarFront,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Clock3,
-  Plus,
-  Building2,
-  Telescope,
   SlidersHorizontal,
+  X,
 } from "lucide-react";
 import {
   api,
   Booking,
   Resource,
+  businessDate,
   dateTime,
   localDate,
   kindNames,
-  nextStates,
 } from "./api";
-import { Empty, ErrorBox, Loading, Modal, PageHead, Status } from "./ui";
+import { ErrorBox, Loading, Modal, Status } from "./ui";
 import { useUser } from "./App";
-const colors = ["#388976", "#547eb3", "#9570ad"];
-export default function CalendarPage({ onCreate }: { onCreate: () => void }) {
+
+const vehicleColors = [
+  "#90caf9",
+  "#a5d6a7",
+  "#ffcc02",
+  "#ce93d8",
+  "#ffab91",
+  "#cceeff",
+  "#ffcccc",
+  "#d7ccc8",
+];
+const addDays = (day: string, amount: number) =>
+  localDate(
+    new Date(businessDate(day + "T12:00").getTime() + amount * 86400000),
+  );
+const slotTime = (day: string, half: number) =>
+  half === 48
+    ? `${addDays(day, 1)}T00:00`
+    : `${day}T${String(Math.floor(half / 2)).padStart(2, "0")}:${half % 2 ? "30" : "00"}`;
+type Selection = { start: string; end: string; resource?: number };
+type ResourceColumn = {
+  id: number;
+  label: string;
+  color: string;
+  kind: string;
+};
+type CalendarBooking = Booking & { eventResource?: number };
+function calendarTitle(day: string, view: string) {
+  const [year, month, date] = day.split("-").map(Number);
+  if (view === "dayGridMonth") return `${year}年${month}月`;
+  if (view === "resourceDay") return `${year}年${month}月${date}日`;
+  const weekday = new Date(day + "T12:00:00Z").getUTCDay();
+  const start = addDays(day, -((weekday + 6) % 7)),
+    end = addDays(start, 6);
+  return `${start.replaceAll("-", "/")} – ${end.slice(5).replace("-", "/")}`;
+}
+export default function CalendarPage() {
   const navigate = useNavigate(),
     u = useUser(),
     ref = useRef<FullCalendar>(null);
   const hasAccess = hasWorkspaceAccess(u);
   const [accessError, setAccessError] = useState("");
+  const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 768px)").matches);
   const resources = useQuery({
-      queryKey: ["resources"],
-      queryFn: () => api<Resource[]>("/resources"),
-      enabled: hasAccess,
-    }),
-    bookings = useQuery({
-      queryKey: ["bookings"],
-      queryFn: () => api<Booking[]>("/bookings"),
-      enabled: hasAccess,
-    });
-  const [selectedIds, setSelected] = useState<number[] | null>(null),
-    [room, setRoom] = useState(true),
-    [equipment, setEquipment] = useState(true),
-    [holiday, setHoliday] = useState(true),
-    [view, setView] = useState("dayGridMonth"),
-    [title, setTitle] = useState(""),
-    [detail, setDetail] = useState<Booking | null>(null),
-    [day, setDay] = useState(localDate()),
-    [selection, setSelection] = useState<{
-      start: string;
-      end: string;
-      resource?: number;
-    } | null>(null);
-  const holidays = useQuery({
-    queryKey: ["holidays"],
-    queryFn: () => api<any[]>("/holidays"),
+    queryKey: ["resources"],
+    queryFn: () => api<Resource[]>("/resources"),
     enabled: hasAccess,
   });
+  const bookings = useQuery({
+    queryKey: ["bookings"],
+    queryFn: () => api<Booking[]>("/bookings"),
+    enabled: hasAccess,
+  });
+  const holidays = useQuery({
+    queryKey: ["holidays"],
+    queryFn: () => api<{ title: string; date: string }[]>("/holidays"),
+    enabled: hasAccess,
+  });
+  const [selectedIds, setSelected] = useState<number[] | null>(null);
+  const [room, setRoom] = useState(true),
+    [equipment, setEquipment] = useState(true),
+    [holiday, setHoliday] = useState(true);
+  const [view, setView] = useState("dayGridMonth"),
+    [day, setDay] = useState(localDate());
+  const [expanded, setExpanded] = useState(false),
+    [drawer, setDrawer] = useState(false);
+  const [detail, setDetail] = useState<CalendarBooking | null>(null),
+    [selection, setSelection] = useState<Selection | null>(null);
   const showHoliday = ["Enabled", "Visible"].includes(
     u.permissions.ui["calendar.options.holidayToggle"],
   );
+  const createKinds = Object.keys(kindNames).filter((kind) =>
+    can(u, bookingDoc(kind), "create"),
+  );
+  const rs = hasAccess ? resources.data || [] : [],
+    bs = hasAccess ? bookings.data || [] : [];
+  const cars = rs.filter((r) => r.kind === "vehicle");
+  const selected = (selectedIds ?? cars.map((r) => r.id)).filter((id) =>
+    cars.some((r) => r.id === id),
+  );
+  const carColor = (id: number) =>
+    vehicleColors[
+      Math.max(
+        0,
+        cars.findIndex((r) => r.id === id),
+      ) % vehicleColors.length
+    ];
+  const columns: ResourceColumn[] = [
+    ...cars
+      .filter((r) => selected.includes(r.id))
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .map((r) => ({
+        id: r.id,
+        label: r.label,
+        kind: "A",
+        color: carColor(r.id),
+      })),
+    ...(room ? [{ id: -1, label: "作業區", kind: "D", color: "#FF9800" }] : []),
+    ...(equipment
+      ? [{ id: -2, label: "儀器設備", kind: "E", color: "#ce93d8" }]
+      : []),
+  ];
   useEffect(() => {
     if (!hasAccess) return;
     const timer = setTimeout(() => {
@@ -77,475 +138,363 @@ export default function CalendarPage({ onCreate }: { onCreate: () => void }) {
     }, 2000);
     return () => clearTimeout(timer);
   }, [hasAccess]);
-  const cars = hasAccess ? resources.data?.filter((r) => r.kind === "vehicle") || [] : [],
-    rs = hasAccess ? resources.data || [] : [],
-    bs = hasAccess ? bookings.data || [] : [];
-  const selected = selectedIds ?? cars.map((car) => car.id);
-  const visible = (b: Booking, s: { resource_id: number }) =>
-    b.kind === "A"
-      ? selected.includes(s.resource_id)
-      : b.kind === "D"
-        ? room
-        : equipment;
-  const events = bs.flatMap((b) =>
-    b.slots
-      .filter((s) => visible(b, s))
-      .map((s, i) => {
-        const r = rs.find((r) => r.id === s.resource_id);
-        const color =
-          b.kind === "D"
-            ? "#be873f"
-            : b.kind === "E"
-              ? "#8970ad"
-              : colors[cars.findIndex((c) => c.id === s.resource_id) % 3];
-        return {
-          id: b.id + "-" + i,
-          title: `${b.content.applicant} · ${b.content.title} · ${b.kind === "D" ? r?.label : (b.content.details || []).map((d: any) => [d.city, d.district].filter(Boolean).join("")).join("、")}`,
-          start: s.start,
-          end: s.end,
-          backgroundColor: color + "17",
-          borderColor: color + "35",
-          textColor: color,
-          extendedProps: {
-            booking: b,
-            label: r?.label,
-            resource_id: s.resource_id,
-          },
-        };
-      }),
-  );
-  const today = localDate(),
-    todayBookings = bs.filter((b) =>
-      b.slots.some(
-        (s) =>
-          localDate(new Date(s.start)) <= today &&
-          localDate(new Date(s.end)) >= today,
-      ),
-    ),
-    upcoming = bs
-      .filter((b) =>
-        b.slots.some((s) => new Date(s.end).getTime() >= Date.now()),
-      )
-      .sort((a, b) => a.slots[0]?.start.localeCompare(b.slots[0]?.start))
-      .slice(0, 4);
-  function changeView(v: string) {
-    setView(v);
-    if (v !== "resourceDay") ref.current?.getApi().changeView(v);
-    else setDay(localDate(ref.current?.getApi().getDate() || new Date()));
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 768px)");
+    const close = () => {
+      setMobile(media.matches);
+      if (!media.matches) setDrawer(false);
+      ref.current?.getApi().updateSize();
+    };
+    media.addEventListener("change", close);
+    return () => media.removeEventListener("change", close);
+  }, []);
+  function moveTo(nextDay: string, nextView = view) {
+    setDay(nextDay);
+    setView(nextView);
+    if (nextView !== "resourceDay")
+      ref.current?.getApi().changeView(nextView, nextDay);
+    setDrawer(false);
+    requestAnimationFrame(() => ref.current?.getApi().updateSize());
   }
   function shift(direction: number) {
-    if (view === "resourceDay") {
-      const d = new Date(day + "T12:00:00+08:00");
-      d.setDate(d.getDate() + direction);
-      setDay(localDate(d));
-    } else if (direction < 0) ref.current?.getApi().prev();
+    if (view === "resourceDay") setDay(addDays(day, direction));
+    else if (direction < 0) ref.current?.getApi().prev();
     else ref.current?.getApi().next();
   }
-  return (
+  function toggleCar(id: number) {
+    setSelected(
+      selected.includes(id)
+        ? selected.filter((value) => value !== id)
+        : [...selected, id],
+    );
+  }
+  const events = bs.flatMap((b) =>
+    b.slots.flatMap((s, i) => {
+      if (
+        !(b.kind === "A"
+          ? selected.includes(s.resource_id)
+          : b.kind === "D"
+            ? room
+            : equipment)
+      )
+        return [];
+      const resource = rs.find((r) => r.id === s.resource_id);
+      const color =
+        b.kind === "D"
+          ? "#FF9800"
+          : b.kind === "E"
+            ? "#ce93d8"
+            : carColor(s.resource_id);
+      const place =
+        b.kind === "D"
+          ? resource?.label
+          : (b.content.details || [])
+              .map((d: any) => [d.city, d.district].filter(Boolean).join(""))
+              .join("、");
+      return [
+        {
+          id: `${b.id}-${i}`,
+          title: [b.content.applicant, b.content.title, place]
+            .filter(Boolean)
+            .join(" "),
+          start: businessDate(s.start).toISOString(),
+          end: businessDate(s.end).toISOString(),
+          backgroundColor: color,
+          borderColor: color,
+          textColor: "#000",
+          extendedProps: {
+            booking: b,
+            resource_id: s.resource_id,
+            label: resource?.label,
+          },
+        },
+      ];
+    }),
+  );
+  const filterContent = (scope: string) => (
     <>
-      <ErrorBox error={accessError} />
-      <PageHead
-        eyebrow="YOUR RESOURCE WORKSPACE"
-        title="每一段行程，都安排妥當。"
-        description="一覽車輛與空間預約，讓團隊的下一步更從容。"
-        action={
-          (can(u, "Lending_form", "create") ||
-            can(u, "Room_form", "create") ||
-            can(u, "Equipment_form", "create")) && (
-            <button className="button primary" onClick={onCreate}>
-              <Plus size={18} />
-              新增預約
-            </button>
-          )
-        }
+      <h2 className="filter-heading">日期</h2>
+      <MiniCalendar
+        value={day}
+        onChange={(value) => moveTo(value, "resourceDay")}
       />
-      <div className="stats-grid">
-        {[
-          [
-            CalendarDays,
-            "今日預約",
-            todayBookings.length,
-            "筆安排",
-            "包含車輛、空間與儀器",
-            "green",
-          ],
-          [CarFront, "公務車輛", cars.length, "輛", "有效車輛資產", "blue"],
-          [
-            Clock3,
-            "使用中",
-            bs.filter(
-              (b) =>
-                b.kind === "A" &&
-                !["PENDING", "RETURN_ARRIVED"].includes(b.status),
-            ).length,
-            "筆",
-            "已發車，尚未完成還車",
-            "orange",
-          ],
-          [
-            Telescope,
-            "儀器設備",
-            rs.filter((r) => r.kind === "equipment").length,
-            "項",
-            "設備預約與資產管理",
-            "purple",
-          ],
-        ].map(([Icon, label, count, unit, note, color]: any) => (
-          <div className="stat-card" key={label}>
-            <div className="stat-top">
-              <span>{label}</span>
-              <div className={"stat-icon " + color}>
-                <Icon size={18} />
+      <div className="vehicle-filter">
+        <button
+          className="vehicle-toggle"
+          aria-expanded={expanded}
+          aria-controls={`vehicle-filter-options-${scope}`}
+          onClick={() => setExpanded(!expanded)}
+        >
+          <span>車牌：</span>
+          <ChevronDown size={22} className={expanded ? "expanded" : ""} />
+        </button>
+        {expanded && (
+          <div
+            className="vehicle-options"
+            id={`vehicle-filter-options-${scope}`}
+          >
+            {selected.length > 0 && (
+              <div className="selected-vehicles" aria-label="已選車牌">
+                {cars
+                  .filter((r) => selected.includes(r.id))
+                  .map((car) => (
+                    <span
+                      className="vehicle-chip"
+                      style={{ background: carColor(car.id) }}
+                      key={car.id}
+                    >
+                      {car.label}
+                      <button
+                        aria-label={`移除 ${car.label}`}
+                        onClick={() => toggleCar(car.id)}
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  ))}
               </div>
-            </div>
-            <div className="stat-number">
-              {String(count).padStart(2, "0")}
-              <span>{unit}</span>
-            </div>
-            <div className="stat-note">{note}</div>
-          </div>
-        ))}
-      </div>
-      <div className="calendar-layout">
-        <section className="panel calendar-panel">
-          <div className="calendar-heading">
-            <div>
-              <h2>
-                預約日曆 <span className="count-pill">{bs.length} 筆</span>
-              </h2>
-              <p>查看資源安排，選取時段即可建立預約</p>
-            </div>
-            <CalendarDays size={20} className="muted" />
-          </div>
-          <div className="calendar-controls">
-            <div className="calendar-date">
-              <h3>
-                {view === "resourceDay" ? day.replaceAll("-", " / ") : title}
-              </h3>
-              <button
-                className="icon-button"
-                aria-label="上一期"
-                onClick={() => shift(-1)}
-              >
-                <ChevronLeft size={17} />
-              </button>
-              <button
-                className="icon-button"
-                aria-label="下一期"
-                onClick={() => shift(1)}
-              >
-                <ChevronRight size={17} />
-              </button>
-              <button
-                className="button compact today-button"
-                onClick={() => {
-                  setDay(localDate());
-                  ref.current?.getApi().today();
+            )}
+            <label className="calendar-check select-all">
+              <input
+                type="checkbox"
+                checked={cars.length > 0 && selected.length === cars.length}
+                ref={(input) => {
+                  if (input)
+                    input.indeterminate =
+                      selected.length > 0 && selected.length < cars.length;
                 }}
-              >
-                今天
-              </button>
-            </div>
-            <div className="segmented">
-              {[
-                ["dayGridMonth", "月"],
-                ["timeGridWeek", "週"],
-                ["resourceDay", "資源日"],
-                ["listWeek", "清單"],
-              ].map(([v, label]) => (
-                <button
-                  key={v}
-                  className={view === v ? "active" : ""}
-                  onClick={() => changeView(v)}
-                >
-                  {label}
-                </button>
+                disabled={!cars.length}
+                onChange={(event) =>
+                  setSelected(event.target.checked ? cars.map((r) => r.id) : [])
+                }
+              />
+              <span>全選</span>
+            </label>
+            <div className="vehicle-list">
+              {cars.map((car) => (
+                <label className="calendar-check" key={car.id}>
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(car.id)}
+                    onChange={() => toggleCar(car.id)}
+                  />
+                  <i
+                    className="calendar-color-dot"
+                    style={{ background: carColor(car.id) }}
+                  />
+                  <span>{car.label}</span>
+                </label>
               ))}
             </div>
           </div>
-          {hasAccess && selected.length === 0 && (
-            <div className="calendar-hint">
-              <SlidersHorizontal size={15} />
-              請勾選右側車牌以顯示車輛預約。作業區預設顯示。
-            </div>
-          )}
-          <ErrorBox error={bookings.error || resources.error} />
-          {hasAccess && bookings.isPending ? (
-            <Loading />
-          ) : (
-            <>
-              <div
-                style={{ display: view === "resourceDay" ? "none" : undefined }}
-              >
-                <FullCalendar
-                  ref={ref}
-                  plugins={[
-                    dayGridPlugin,
-                    timeGridPlugin,
-                    listPlugin,
-                    interactionPlugin,
-                    luxonPlugin,
-                  ]}
-                  initialView="dayGridMonth"
-                  locale="zh-tw"
-                  timeZone="Asia/Taipei"
-                  headerToolbar={false}
-                  height="auto"
-                  firstDay={1}
-                  dayMaxEvents={3}
-                  fixedWeekCount={false}
-                  allDayText="全天"
-                  noEventsContent="此週沒有符合篩選的預約"
-                  buttonText={{
-                    today: "今天",
-                    month: "月",
-                    week: "週",
-                    day: "日",
-                    list: "清單",
-                  }}
-                  events={[
-                    ...events,
-                    ...(hasAccess && holiday
-                      ? (holidays.data || []).map((h, i) => ({
-                          id: "holiday-" + i,
-                          title: h.title,
-                          start: h.date,
-                          allDay: true,
-                          display: "background",
-                          backgroundColor: "#f5eedf",
-                        }))
-                      : []),
-                  ]}
-                  selectable={
-                    can(u, "Lending_form", "create") ||
-                    can(u, "Room_form", "create") ||
-                    can(u, "Equipment_form", "create")
-                  }
-                  selectMirror
-                  datesSet={(arg) =>
-                    setTitle(
-                      `${arg.view.currentStart.getFullYear()} 年 ${arg.view.currentStart.getMonth() + 1} 月`,
-                    )
-                  }
-                  dateClick={(arg) => {
-                    if (!hasAccess) { setAccessError("沒有權限"); return; }
-                    if (view === "dayGridMonth") {
-                      setDay(arg.dateStr);
-                      setView("resourceDay");
-                    }
-                  }}
-                  select={(arg) => {
-                    if (view === "dayGridMonth") return;
-                    setSelection({ start: arg.startStr, end: arg.endStr });
-                    ref.current?.getApi().unselect();
-                  }}
-                  eventClick={(arg) => {
-                    if (arg.event.extendedProps.booking)
-                      setDetail({
-                        ...arg.event.extendedProps.booking,
-                        eventResource: arg.event.extendedProps.resource_id,
-                      });
-                  }}
-                  eventContent={(arg) => (
-                    <div className="calendar-event">
-                      <span>{arg.timeText}</span>
-                      <strong>{arg.event.title}</strong>
-                      <small>{arg.event.extendedProps.label}</small>
-                    </div>
-                  )}
-                />
+        )}
+      </div>
+      <h2 className="filter-heading workspace-filter-title">作業區</h2>
+      <label className="calendar-check">
+        <input
+          type="checkbox"
+          checked={room}
+          onChange={(event) => setRoom(event.target.checked)}
+        />
+        <i className="calendar-color-dot" style={{ background: "#FF9800" }} />
+        <span>作業區預約</span>
+      </label>
+      <label className="calendar-check">
+        <input
+          type="checkbox"
+          checked={equipment}
+          onChange={(event) => setEquipment(event.target.checked)}
+        />
+        <i className="calendar-color-dot" style={{ background: "#ce93d8" }} />
+        <span>儀器設備</span>
+      </label>
+    </>
+  );
+  return (
+    <div className="calendar-page" data-view={view} data-date={day}>
+      <div className="calendar-layout">
+        <section className="calendar-panel" aria-label="預約日曆">
+          <div className="calendar-controls">
+            <div className="calendar-navigation">
+              <div className="calendar-button-group">
+                <button aria-label="上一期" onClick={() => shift(-1)}>
+                  <ChevronLeft size={20} />
+                </button>
+                <button aria-label="下一期" onClick={() => shift(1)}>
+                  <ChevronRight size={20} />
+                </button>
               </div>
-              {view === "resourceDay" && (
-                <div className="resource-grid-wrap">
-                  <div
-                    className="resource-grid"
-                    style={{
-                      gridTemplateColumns: `58px repeat(${selected.length + (room ? 1 : 0) + (equipment ? 1 : 0) || 1}, minmax(155px, 1fr))`,
-                    }}
+              <button onClick={() => moveTo(localDate())}>今天</button>
+            </div>
+            <h1 className="calendar-title" aria-live="polite">
+              {calendarTitle(day, view)}
+            </h1>
+            <div className="calendar-view-controls">
+              <div className="calendar-button-group" aria-label="日曆視圖">
+                {[
+                  ["dayGridMonth", "月"],
+                  ["timeGridWeek", "週"],
+                  ["resourceDay", "天"],
+                  ["listWeek", "活動列表"],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    aria-pressed={view === value}
+                    className={view === value ? "active" : ""}
+                    onClick={() => moveTo(day, value)}
                   >
-                    <div className="resource-head">時間</div>
-                    {[
-                      ...cars.filter((c) => selected.includes(c.id)),
-                      ...(room ? [{ id: -1, label: "作業區" }] : []),
-                      ...(equipment ? [{ id: -2, label: "儀器設備" }] : []),
-                    ].map((r) => (
-                      <div className="resource-head" key={r.id}>
-                        {r.label}
-                      </div>
-                    ))}
-                    {Array.from({ length: 24 }, (_, hour) => (
-                      <ResourceHour
-                        key={hour}
-                        hour={hour}
-                        day={day}
-                        columns={[
-                          ...cars.filter((c) => selected.includes(c.id)),
-                          ...(room ? [{ id: -1, label: "作業區" }] : []),
-                          ...(equipment ? [{ id: -2, label: "儀器設備" }] : []),
-                        ]}
-                        bookings={bs}
-                        onEvent={setDetail}
-                        onSelect={(id, h) => {
-                          if (
-                            can(u, "Lending_form", "create") ||
-                            can(u, "Room_form", "create") ||
-                            can(u, "Equipment_form", "create")
-                          )
-                            setSelection({
-                              start: `${day}T${String(h).padStart(2, "0")}:00`,
-                              end:
-                                h === 23
-                                  ? `${localDate(new Date(new Date(day + "T12:00:00+08:00").getTime() + 86400000))}T00:00`
-                                  : `${day}T${String(h + 1).padStart(2, "0")}:00`,
-                              resource: id > 0 ? id : undefined,
-                            });
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {showHoliday && (
+                <button
+                  className="holiday-toggle"
+                  disabled={holidays.isPending || !hasAccess}
+                  onClick={() => setHoliday(!holiday)}
+                >
+                  {holidays.isPending
+                    ? "節日載入中…"
+                    : holiday
+                      ? "隱藏節日"
+                      : "顯示節日"}
+                </button>
               )}
-            </>
+            </div>
+          </div>
+          <ErrorBox
+            error={accessError || bookings.error || resources.error || holidays.error}
+          />
+          {!hasAccess && (
+            <p className="calendar-access-note">
+              此帳號尚未取得 AMS 功能權限。
+            </p>
           )}
-          <div className="calendar-bottom">
-            <span>
-              <i className="legend-dot green" />
-              車輛
-            </span>
-            <span>
-              <i className="legend-dot orange" />
-              作業區
-            </span>
-            <span>
-              <i className="legend-dot purple" />
-              儀器
-            </span>
-            <span className="calendar-timezone">時間顯示：臺北 UTC+8</span>
+          <div className="calendar-body">
+            {hasAccess && (bookings.isPending || resources.isPending) ? (
+              <Loading />
+            ) : (
+              <>
+                <div
+                  className="fullcalendar-host"
+                  hidden={view === "resourceDay"}
+                >
+                  <FullCalendar
+                    ref={ref}
+                    plugins={[
+                      dayGridPlugin,
+                      timeGridPlugin,
+                      listPlugin,
+                      interactionPlugin,
+                      luxonPlugin,
+                    ]}
+                    initialView="dayGridMonth"
+                    initialDate={day}
+                    locale={zhTwLocale}
+                    timeZone="Asia/Taipei"
+                    headerToolbar={false}
+                    height={mobile ? "auto" : "100%"}
+                    aspectRatio={mobile ? 1.35 : 1.8}
+                    firstDay={1}
+                    dayMaxEvents={3}
+                    fixedWeekCount={false}
+                    allDaySlot={false}
+                    nowIndicator
+                    businessHours={{
+                      daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+                      startTime: "08:00",
+                      endTime: "18:00",
+                    }}
+                    displayEventTime={false}
+                    eventDisplay="block"
+                    noEventsContent="此週沒有符合篩選的預約"
+                    events={[
+                      ...events,
+                      ...(hasAccess && holiday
+                        ? (holidays.data || []).map((h, i) => ({
+                            id: `holiday-${i}`,
+                            title: h.title,
+                            start: h.date,
+                            allDay: true,
+                            backgroundColor: "#C8E6C9",
+                            borderColor: "#C8E6C9",
+                            textColor: "#000",
+                          }))
+                        : []),
+                    ]}
+                    selectable={createKinds.length > 0}
+                    selectMirror
+                    datesSet={(arg) => {
+                      if (view !== "resourceDay")
+                        setDay(localDate(arg.view.calendar.getDate()));
+                    }}
+                    dateClick={(arg) => {
+                      if (!hasAccess) { setAccessError("沒有權限"); return; }
+                      if (view === "dayGridMonth")
+                        moveTo(arg.dateStr, "resourceDay");
+                      else if (
+                        createKinds.length &&
+                        window.matchMedia("(max-width: 768px)").matches
+                      )
+                        setSelection({
+                          start: arg.dateStr,
+                          end: new Date(
+                            arg.date.getTime() + 3600000,
+                          ).toISOString(),
+                        });
+                    }}
+                    select={(arg) => {
+                      if (view === "dayGridMonth") return;
+                      setSelection({ start: arg.startStr, end: arg.endStr });
+                      ref.current?.getApi().unselect();
+                    }}
+                    eventClick={(arg) => {
+                      if (arg.event.extendedProps.booking)
+                        setDetail({
+                          ...arg.event.extendedProps.booking,
+                          eventResource: arg.event.extendedProps.resource_id,
+                        });
+                    }}
+                    eventContent={(arg) => (
+                      <div className="calendar-event" title={arg.event.title}>
+                        {arg.event.title}
+                      </div>
+                    )}
+                  />
+                </div>
+                {view === "resourceDay" && (
+                  <ResourceDay
+                    day={day}
+                    columns={columns}
+                    bookings={bs}
+                    canCreate={createKinds.length > 0}
+                    holidays={
+                      holiday
+                        ? (holidays.data || []).filter((h) => h.date === day)
+                        : []
+                    }
+                    onEvent={setDetail}
+                    onSelect={setSelection}
+                  />
+                )}
+              </>
+            )}
           </div>
         </section>
-        <aside className="calendar-aside">
-          <section className="panel filter-panel">
-            <div className="section-title">
-              <h3>資源篩選</h3>
-              <SlidersHorizontal size={17} />
-            </div>
-            <div className="filter-label">
-              公務車輛{" "}
-              <button
-                onClick={() =>
-                  setSelected(
-                    selected.length === cars.length
-                      ? []
-                      : cars.map((c) => c.id),
-                  )
-                }
-              >
-                {selected.length === cars.length ? "取消全選" : "全選"}
-              </button>
-            </div>
-            {cars.map((car, i) => (
-              <label className="resource-check" key={car.id}>
-                <input
-                  type="checkbox"
-                  checked={selected.includes(car.id)}
-                  onChange={() =>
-                    setSelected((previous) => {
-                      const current = previous ?? cars.map((car) => car.id);
-                      return current.includes(car.id)
-                        ? current.filter((id) => id !== car.id)
-                        : [...current, car.id];
-                    })
-                  }
-                />
-                <span
-                  className="color-dot"
-                  style={{ background: colors[i % 3] }}
-                />
-                <span>
-                  <strong>{car.label}</strong>
-                  <small>{car.model}</small>
-                </span>
-              </label>
-            ))}
-            <div className="filter-divider" />
-            <label className="resource-check">
-              <input
-                type="checkbox"
-                checked={room}
-                onChange={(e) => setRoom(e.target.checked)}
-              />
-              <Building2 size={17} className="orange-text" />
-              <span>作業區</span>
-            </label>
-            <label className="resource-check">
-              <input
-                type="checkbox"
-                checked={equipment}
-                onChange={(e) => setEquipment(e.target.checked)}
-              />
-              <Telescope size={17} className="purple-text" />
-              <span>儀器設備</span>
-            </label>
-            <label
-              style={{ display: showHoliday ? undefined : "none" }}
-              className="resource-check"
-            >
-              <input
-                type="checkbox"
-                checked={holiday}
-                onChange={(e) => setHoliday(e.target.checked)}
-              />
-              <CalendarDays size={17} />
-              <span>測試假日</span>
-            </label>
-            <small className="muted">此環境假日為示範資料。</small>
-          </section>
-          <section className="panel upcoming-panel">
-            <div className="section-title">
-              <h3>接下來的安排</h3>
-              <span className="live-dot" />
-            </div>
-            {upcoming.length ? (
-              upcoming.map((b) => (
-                <button
-                  className="upcoming"
-                  key={b.id}
-                  onClick={() => setDetail(b)}
-                >
-                  <div className={"upcoming-line type-" + b.kind} />
-                  <div>
-                    <small>{dateTime(b.slots[0]?.start || "")}</small>
-                    <strong>{b.content.title}</strong>
-                    <span>
-                      {b.content.applicant} <i /> {kindNames[b.kind]}
-                    </span>
-                  </div>
-                  <ArrowUpRight size={15} />
-                </button>
-              ))
-            ) : (
-              <Empty
-                title="暫無後續安排"
-                description="新的預約會顯示在這裡。"
-              />
-            )}
-            <button
-              className="text-link all-bookings"
-              onClick={() => navigate("/bookings")}
-            >
-              查看所有借用紀錄
-              <ArrowRight size={15} />
-            </button>
-          </section>
-          <div className="tip-card">
-            <div className="tip-icon">
-              <CalendarDays size={20} />
-            </div>
-            <h3>安排下一段工作</h3>
-            <p>點選日曆日期查看資源日視圖，讓每個時段都有清楚的安排。</p>
-          </div>
+        <aside className="calendar-filter-desktop" aria-label="日曆篩選">
+          {filterContent("desktop")}
         </aside>
       </div>
+      <button
+        className="calendar-filter-fab"
+        aria-label="開啟日曆篩選"
+        onClick={() => setDrawer(true)}
+      >
+        <SlidersHorizontal size={24} />
+      </button>
+      <FilterDrawer open={drawer} onClose={() => setDrawer(false)}>
+        {filterContent("drawer")}
+      </FilterDrawer>
       <Modal open={!!detail} title="預約詳情" onClose={() => setDetail(null)}>
         {detail && (
           <>
@@ -575,17 +524,20 @@ export default function CalendarPage({ onCreate }: { onCreate: () => void }) {
               </div>
             ))}
             <div className="actions">
+              <button className="button" onClick={() => setDetail(null)}>
+                關閉
+              </button>
               <button
                 className="button primary"
                 disabled={detail.detail_allowed === false}
-                title={detail.detail_allowed === false ? "無法修改他人借用紀錄" : undefined}
+                title={
+                  detail.detail_allowed === false
+                    ? "無法修改他人借用紀錄"
+                    : undefined
+                }
                 onClick={() =>
                   navigate(
-                    "/bookings/" +
-                      detail.id +
-                      ((detail as any).eventResource
-                        ? "?resource=" + (detail as any).eventResource
-                        : ""),
+                    `/bookings/${detail.id}${detail.eventResource ? `?resource=${detail.eventResource}` : ""}`,
                   )
                 }
               >
@@ -602,79 +554,390 @@ export default function CalendarPage({ onCreate }: { onCreate: () => void }) {
         onClose={() => setSelection(null)}
       >
         <p className="muted">
-          {selection?.start.replace("T", " ")} →{" "}
-          {selection?.end.replace("T", " ")}
+          {selection &&
+            `${dateTime(selection.start)} → ${dateTime(selection.end)}`}
         </p>
         <div className="create-options">
-          {Object.entries(kindNames).map(([k, name]) => (
+          {createKinds.map((kind) => (
             <button
-              key={k}
+              key={kind}
               onClick={() =>
-                navigate("/bookings/new/" + k, { state: selection })
+                navigate(`/bookings/new/${kind}`, {
+                  state: {
+                    ...selection,
+                    resource: kind === "A" ? selection?.resource : undefined,
+                  },
+                })
               }
             >
-              <strong>{name}</strong>
+              <strong>{kindNames[kind]}</strong>
               <ArrowRight size={18} />
             </button>
           ))}
         </div>
       </Modal>
-    </>
+    </div>
   );
 }
-function ResourceHour({
-  hour,
+function MiniCalendar({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (day: string) => void;
+}) {
+  const [month, setMonth] = useState(value.slice(0, 7));
+  useEffect(() => setMonth(value.slice(0, 7)), [value]);
+  const [year, monthNumber] = month.split("-").map(Number),
+    first = `${month}-01`;
+  const offset = (new Date(first + "T12:00:00Z").getUTCDay() + 6) % 7,
+    length = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  const dates = Array.from(
+    { length: Math.ceil((offset + length) / 7) * 7 },
+    (_, i) => addDays(first, i - offset),
+  );
+  function shift(amount: number) {
+    const next = new Date(Date.UTC(year, monthNumber - 1 + amount, 1));
+    setMonth(
+      `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`,
+    );
+  }
+  return (
+    <div className="mini-calendar" aria-label="小日曆">
+      <div className="mini-calendar-header">
+        <button aria-label="小日曆上個月" onClick={() => shift(-1)}>
+          <ChevronLeft size={16} />
+        </button>
+        <strong>
+          {year}年{monthNumber}月
+        </strong>
+        <button aria-label="小日曆下個月" onClick={() => shift(1)}>
+          <ChevronRight size={16} />
+        </button>
+      </div>
+      <div className="mini-calendar-weekdays">
+        {["一", "二", "三", "四", "五", "六", "日"].map((label) => (
+          <span key={label}>{label}</span>
+        ))}
+      </div>
+      <div className="mini-calendar-days">
+        {dates.map((date) => (
+          <button
+            key={date}
+            aria-label={`選擇 ${date}`}
+            aria-pressed={date === value}
+            className={[
+              date === value ? "selected" : "",
+              date === localDate() ? "today" : "",
+              date.slice(0, 7) !== month ? "outside" : "",
+            ].join(" ")}
+            onClick={() => onChange(date)}
+          >
+            {Number(date.slice(8))}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+function FilterDrawer({
+  open,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const dialog = useRef<HTMLDivElement>(null),
+    close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement as HTMLElement,
+      overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close.current();
+      }
+      if (event.key !== "Tab") return;
+      const elements = Array.from(
+          dialog.current?.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), input:not(:disabled), [tabindex="0"]',
+          ) || [],
+        ),
+        first = elements[0],
+        last = elements.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", key);
+    return () => {
+      document.body.style.overflow = overflow;
+      document.removeEventListener("keydown", key);
+      previous?.focus();
+    };
+  }, [open]);
+  if (!open) return null;
+  return createPortal(
+    <div className="calendar-drawer-backdrop" onClick={() => close.current()}>
+      <div
+        ref={dialog}
+        className="calendar-filter-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="calendar-filter-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="calendar-drawer-heading">
+          <h2 id="calendar-filter-title">篩選選項</h2>
+          <button aria-label="關閉日曆篩選" onClick={onClose}>
+            <X size={22} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+function ResourceDay({
   day,
   columns,
   bookings,
+  canCreate,
+  holidays,
   onEvent,
   onSelect,
 }: {
-  hour: number;
   day: string;
-  columns: { id: number; label: string }[];
+  columns: ResourceColumn[];
   bookings: Booking[];
-  onEvent: (b: Booking) => void;
-  onSelect: (id: number, h: number) => void;
+  canCreate: boolean;
+  holidays: { title: string }[];
+  onEvent: (booking: CalendarBooking) => void;
+  onSelect: (selection: Selection) => void;
 }) {
-  const start = new Date(
-      `${day}T${String(hour).padStart(2, "0")}:00:00+08:00`,
-    ).getTime(),
-    end = start + 3600000;
+  const [drag, setDrag] = useState<{
+      id: number;
+      from: number;
+      to: number;
+    } | null>(null),
+    dragging = useRef<typeof drag>(null);
+  const touching = useRef(false);
+  const dayStart = businessDate(day).getTime(),
+    dayEnd = dayStart + 86400000,
+    now = (Date.now() - dayStart) / 60000;
+  function position(element: HTMLElement, y: number) {
+    return Math.max(
+      0,
+      Math.min(47, Math.floor((y - element.getBoundingClientRect().top) / 30)),
+    );
+  }
+  if (!columns.length)
+    return (
+      <div className="resource-empty" role="status">
+        請勾選車牌、作業區或儀器設備以顯示資源。
+      </div>
+    );
   return (
     <>
-      <div className="resource-time">{String(hour).padStart(2, "0")}:00</div>
-      {columns.map((r) => (
-        <div className="resource-cell" key={r.id}>
-          <button
-            className="slot-add"
-            aria-label={`預約 ${r.label} ${hour}:00`}
-            onClick={() => onSelect(r.id, hour)}
-          />
-          {bookings
-            .filter((b) =>
-              b.slots.some(
-                (s) =>
-                  (r.id > 0
-                    ? s.resource_id === r.id
-                    : r.id === -1
-                      ? b.kind === "D"
-                      : b.kind === "E") &&
-                  new Date(s.start).getTime() < end &&
-                  new Date(s.end).getTime() >= start,
-              ),
-            )
-            .map((b) => (
-              <button
-                className={"resource-event type-" + b.kind}
-                key={b.id}
-                onClick={() => onEvent(b)}
-              >
-                {b.content.applicant} · {b.content.title}
-              </button>
-            ))}
+      {holidays.length > 0 && (
+        <div className="resource-holiday">
+          {holidays.map((h) => h.title).join("、")}
         </div>
-      ))}
+      )}
+      <div
+        className="resource-grid-wrap"
+        tabIndex={0}
+        aria-label="資源日時段表"
+      >
+        <div
+          className="resource-day-grid"
+          style={{
+            gridTemplateColumns: `58px repeat(${columns.length}, minmax(120px, 1fr))`,
+          }}
+        >
+          <div className="resource-head">時間</div>
+          {columns.map((r) => (
+            <div className="resource-head" data-resource-id={r.id} key={r.id}>
+              <i
+                className="calendar-color-dot"
+                style={{ background: r.color }}
+              />
+              {r.label}
+            </div>
+          ))}
+          <div className="resource-time-lane">
+            {Array.from({ length: 24 }, (_, hour) => (
+              <div key={hour}>{String(hour).padStart(2, "0")}:00</div>
+            ))}
+          </div>
+          {columns.map((r) => {
+            const items = bookings
+              .flatMap((b) =>
+                b.slots.flatMap((s, i) => {
+                  if (
+                    !(r.id > 0
+                      ? b.kind === "A" && s.resource_id === r.id
+                      : b.kind === r.kind)
+                  )
+                    return [];
+                  const start = businessDate(s.start).getTime(),
+                    end = businessDate(s.end).getTime();
+                  if (start >= dayEnd || end <= dayStart) return [];
+                  return [
+                    {
+                      key: `${b.id}-${i}`,
+                      booking: b,
+                      resource: s.resource_id,
+                      start: Math.max(start, dayStart),
+                      end: Math.min(end, dayEnd),
+                      lane: 0,
+                      count: 1,
+                    },
+                  ];
+                }),
+              )
+              .sort((a, b) => a.start - b.start || b.end - a.end);
+            let cluster: typeof items = [],
+              clusterEnd = 0;
+            const assign = () => {
+              const ends: number[] = [];
+              for (const item of cluster) {
+                let lane = ends.findIndex((end) => end <= item.start);
+                if (lane < 0) lane = ends.length;
+                ends[lane] = item.end;
+                item.lane = lane;
+              }
+              for (const item of cluster) item.count = ends.length;
+            };
+            for (const item of items) {
+              if (item.start >= clusterEnd && cluster.length) {
+                assign();
+                cluster = [];
+              }
+              cluster.push(item);
+              clusterEnd = Math.max(...cluster.map((event) => event.end));
+            }
+            assign();
+            return (
+              <div
+                className="resource-day-lane"
+                key={r.id}
+                data-resource-id={r.id}
+                onPointerDown={(event) => {
+                  if (
+                    !canCreate ||
+                    event.button !== 0 ||
+                    (event.target as HTMLElement).closest(".resource-event")
+                  )
+                    return;
+                  // Touch opens on click, after the synthetic click has landed.
+                  // Opening on pointerup lets that click close the new backdrop.
+                  if (event.pointerType === "touch") { touching.current = true; return; }
+                  touching.current = false;
+                  const from = position(event.currentTarget, event.clientY),
+                    current = { id: r.id, from, to: from };
+                  dragging.current = current;
+                  setDrag(current);
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }}
+                onPointerMove={(event) => {
+                  if (dragging.current?.id !== r.id) return;
+                  const current = {
+                    ...dragging.current,
+                    to: position(event.currentTarget, event.clientY),
+                  };
+                  dragging.current = current;
+                  setDrag(current);
+                }}
+                onPointerUp={(event) => {
+                  const current = dragging.current;
+                  if (!current) return;
+                  dragging.current = null;
+                  setDrag(null);
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                  onSelect({
+                    start: slotTime(day, Math.min(current.from, current.to)),
+                    end: slotTime(day, Math.max(current.from, current.to) + 1),
+                    resource: r.id > 0 ? r.id : undefined,
+                  });
+                }}
+                onPointerCancel={() => {
+                  touching.current = false;
+                  dragging.current = null;
+                  setDrag(null);
+                }}
+              >
+                {Array.from({ length: 48 }, (_, half) => (
+                  <button
+                    className={`resource-slot ${half >= 16 && half < 36 ? "business-hour" : ""}`}
+                    key={half}
+                    disabled={!canCreate}
+                    aria-label={`預約 ${r.label} ${slotTime(day, half).slice(11)}`}
+                    onClick={(event) => {
+                      if ((event.detail === 0 || touching.current) && canCreate) {
+                        touching.current = false;
+                        onSelect({
+                          start: slotTime(day, half),
+                          end: slotTime(day, half + 1),
+                          resource: r.id > 0 ? r.id : undefined,
+                        });
+                      }
+                    }}
+                  />
+                ))}
+                {drag?.id === r.id && (
+                  <div
+                    className="resource-selection"
+                    style={{
+                      top: Math.min(drag.from, drag.to) * 30,
+                      height: (Math.abs(drag.to - drag.from) + 1) * 30,
+                    }}
+                  />
+                )}
+                {items.map((item) => (
+                  <button
+                    className="resource-event"
+                    key={item.key}
+                    data-booking-id={item.booking.id}
+                    title={`${item.booking.content.applicant} ${item.booking.content.title}`}
+                    style={{
+                      top: (item.start - dayStart) / 60000,
+                      height: Math.max(18, (item.end - item.start) / 60000),
+                      background: r.color,
+                      left: `calc(${(item.lane / item.count) * 100}% + 2px)`,
+                      width: `calc(${100 / item.count}% - 4px)`,
+                    }}
+                    onClick={() =>
+                      onEvent({ ...item.booking, eventResource: item.resource })
+                    }
+                  >
+                    {item.booking.content.applicant}{" "}
+                    {item.booking.content.title}
+                  </button>
+                ))}
+                {now >= 0 && now < 1440 && (
+                  <div
+                    className="resource-now"
+                    style={{ top: now }}
+                    aria-label="現在時間"
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </>
   );
 }

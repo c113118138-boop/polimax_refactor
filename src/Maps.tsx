@@ -1,3 +1,4 @@
+export { Positions, Scans, FindMy } from "./LocationPages";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -44,7 +45,7 @@ function recentTrajectoryRange(days: number, end = new Date()) {
     to: localInput(end.toISOString()),
   };
 }
-export function Positions() {
+function PreviousPositions() {
   const [params] = useSearchParams();
   const [initialRange] = useState(() => recentTrajectoryRange(30));
   const [range, setRange] = useState(
@@ -56,12 +57,15 @@ export function Positions() {
     }),
     positions = useQuery({
       queryKey: ["positions"],
-      queryFn: () =>
-        api<any[]>("/positions"),
+      queryFn: () => api<any[]>("/positions"),
       staleTime: 0,
     });
   const [selected, setSelected] = useState(Number(params.get("resource")) || 0),
-    [mode, setMode] = useState(params.get("start") ? "history" : "latest"),
+    [mode, setMode] = useState(
+      params.get("start") || params.get("view") === "history"
+        ? "history"
+        : "latest",
+    ),
     [from, setFrom] = useState(
       params.get("start")
         ? localInput(params.get("start")!)
@@ -426,7 +430,7 @@ export function Positions() {
 function Chevron() {
   return <ArrowRight size={15} />;
 }
-export function Scans() {
+function PreviousScans() {
   const [station, setStation] = useState("");
   const stations = useQuery({
     queryKey: ["stations"],
@@ -564,7 +568,7 @@ export function Scans() {
     </>
   );
 }
-export function FindMy() {
+function PreviousFindMy() {
   const beacons = useQuery({
     queryKey: ["beacons"],
     queryFn: () => api<any[]>("/beacons"),
@@ -573,8 +577,7 @@ export function FindMy() {
     [search, setSearch] = useState("");
   const report = useQuery({
     queryKey: ["findmy", id],
-    queryFn: () =>
-      api("/findmy/" + encodeURIComponent(id)),
+    queryFn: () => api("/findmy/" + encodeURIComponent(id)),
     staleTime: 0,
     enabled: !!id,
   });

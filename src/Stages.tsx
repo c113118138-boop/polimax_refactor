@@ -22,6 +22,7 @@ import {
 } from "./ui";
 import { can, canFillDeparture, bookingDoc, Scope } from "./Access";
 import { useUser } from "./App";
+import { useUnsavedChanges } from "./NavigationGuard";
 const checksB = [
   "擋風玻璃清潔",
   "照後鏡清潔",
@@ -66,377 +67,45 @@ const initial = () => ({
   equipment_files: [],
   parking_files: [],
 });
-function PartEditor({
-  data: d,
-  set,
-  kind,
-  part,
-  booking,
-  resources,
-}: {
-  data: any;
-  set: (key: string, v: any) => void;
-  kind: string;
-  part: string;
-  booking?: Booking;
-  resources: Resource[];
-}) {
-  const u = useUser();
-  const departure = part === "start";
-  const cars =
-    booking?.slots
-      .map(
-        (s) =>
-          resources.find((r) => r.id === s.resource_id) ||
-          booking.content.resource_snapshots?.find(
-            (r: any) => r.id === s.resource_id,
-          ),
-      )
-      .filter(
-        (r: any, i: number, a: any[]) =>
-          r && a.findIndex((x) => x?.id === r.id) === i,
-      ) || [];
-  return (
-    <div className="fields-grid">
-      {departure && (
-        <>
-          <Field label="車輛" required>
-            {d.submitted_at ? (
-              <input value={d.plate || ""} readOnly />
-            ) : (
-              <select
-                required
-                value={d.resource_id || ""}
-                onChange={(e) => set("resource_id", Number(e.target.value))}
-              >
-                <option value="">選擇本次使用車輛</option>
-                {cars.map((r: any) => (
-                  <option key={r.id} value={r.id}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-          <Field label="預約帶入時間">
-            <input
-              readOnly
-              value={
-                d.reservation_start
-                  ? dateTime(d.reservation_start)
-                  : dateTime(
-                      booking?.slots.find(
-                        (s) => s.resource_id === d.resource_id,
-                      )?.start || "",
-                    )
-              }
-            />
-          </Field>
-          <Field label="駕駛人員" required>
-            <input required value={d.driver || ""} onChange={(e) => set("driver", e.target.value)} placeholder="請填寫駕駛姓名" />
-          </Field>
-          <Field label="副駕人員（兩人以上必填）">
-            <input value={d.codriver || ""} onChange={(e) => set("codriver", e.target.value)} placeholder="請填寫副駕姓名" />
-          </Field>
-          <Field label="第一位借用人員" required>
-            <input readOnly value={d.employees?.[0] || u.name} />
-          </Field>
-          <Field label="第二位借用人員（選填）">
-            <input value={d.employees?.[1] || ""} placeholder="請填寫第二位借用人員姓名"
-              onChange={(e) => set("employees", [d.employees?.[0] || u.name, ...(e.target.value ? [e.target.value] : [])])} />
-          </Field>
-          <div className="span-2">
-            <Field
-              label={kind === "C" ? "回程發車地點" : "去程發車地點"}
-              required
-            >
-              <input
-                required
-                value={d.place}
-                onChange={(e) => set("place", e.target.value)}
-              />
-            </Field>
-          </div>
-          <div className="span-2">
-            <Field label="車輛檢查（全部必須確認）" required>
-              <div className="purpose-grid">
-                {(kind === "B" ? checksB : checksC).map((c) => (
-                  <label key={c}>
-                    <input
-                      type="checkbox"
-                      checked={d.checks?.includes(c) || false}
-                      onChange={(e) =>
-                        set(
-                          "checks",
-                          e.target.checked
-                            ? [...(d.checks || []), c]
-                            : d.checks.filter((x: string) => x !== c),
-                        )
-                      }
-                    />
-                    {c}
-                  </label>
-                ))}
-              </div>
-            </Field>
-          </div>
-          {(kind === "B"
-            ? [
-                ["tires", "輪胎"],
-                ["interior", "車輛內部"],
-                ["exterior", "車體外部"],
-                ["equipment", "隨車設備"],
-              ]
-            : [
-                ["exterior", "車體外部"],
-                ["equipment", "隨車設備"],
-              ]
-          ).map(([key, label]) => (
-            <div key={key}>
-              <Field label={label + "狀況"} required>
-                <select
-                  value={d[key]}
-                  onChange={(e) => set(key, e.target.value)}
-                >
-                  <option>正常</option>
-                  <option>異狀</option>
-                </select>
-              </Field>
-              {d[key] === "異狀" && (
-                <Field label={label + "異狀說明"} required>
-                  <textarea
-                    required
-                    value={d[key + "_note"] || ""}
-                    onChange={(e) => set(key + "_note", e.target.value)}
-                  />
-                </Field>
-              )}
-            </div>
-          ))}
-          {kind === "C" &&
-            photoFields
-              .filter(
-                ([key]) => key !== "exterior_files" || d.exterior === "異狀",
-              )
-              .filter(
-                ([key]) => key !== "equipment_files" || d.equipment === "異狀",
-              )
-              .map(([key, label]) => (
-                <div className="span-2" key={key}>
-                  <Field label={label}>
-                    <FileUpload
-                      images
-                      value={d[key] || []}
-                      onChange={(v) => set(key, v)}
-                    />
-                  </Field>
-                </div>
-              ))}
-        </>
-      )}
-      <Field label={departure ? "開始里程（km）" : "結束里程（km）"} required>
-        <input
-          type="number"
-          min={0}
-          step="0.1"
-          required
-          value={d.mileage}
-          onChange={(e) => set("mileage", e.target.value)}
-        />
-      </Field>
-      <div className="span-2">
-        <label className="check-line">
-          <input
-            type="checkbox"
-            required
-            checked={d.confirmed}
-            onChange={(e) => set("confirmed", e.target.checked)}
-          />
-          我已確認本階段里程
-        </label>
-      </div>
-      {!departure && (
-        <div className="span-2">
-          <Field label="途中異常（可複選）">
-            <div className="purpose-grid">
-              {["維修", "違規", "事故"].map((a) => (
-                <label key={a}>
-                  <input
-                    type="checkbox"
-                    checked={d.anomalies?.includes(a) || false}
-                    onChange={(e) =>
-                      set(
-                        "anomalies",
-                        e.target.checked
-                          ? [...(d.anomalies || []), a]
-                          : d.anomalies.filter((v: string) => v !== a),
-                      )
-                    }
-                  />
-                  {a}
-                </label>
-              ))}
-            </div>
-          </Field>
-          {d.anomalies?.map((a: string) => (
-            <div className="repeat-card" key={a}>
-              <h3>{a}資料</h3>
-              {[
-                "place",
-                "reason",
-                ...(a === "維修"
-                  ? ["repair_shop"]
-                  : a === "事故"
-                    ? ["internal_injury", "external_injury"]
-                    : []),
-                "notes",
-              ].map((key) => (
-                <Field
-                  key={key}
-                  field={key}
-                  label={
-                    (
-                      {
-                        place: a === "維修" ? "故障地點" : "發生地點",
-                        reason: a === "維修" ? "車輛問題部位" : "事由／原因",
-                        repair_shop: "維修地點／維修廠",
-                        internal_injury: "公司內部人員受傷狀況",
-                        external_injury: "對方人員受傷狀況",
-                        notes: "備註",
-                      } as Record<string, string>
-                    )[key]
-                  }
-                >
-                  <input
-                    value={d.anomaly_details?.[a]?.[key] || ""}
-                    onChange={(e) =>
-                      set("anomaly_details", {
-                        ...d.anomaly_details,
-                        [a]: {
-                          ...d.anomaly_details?.[a],
-                          [key]: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                </Field>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="span-2">
-        <Field label="其他附件">
-          <FileUpload
-            value={d.attachments || []}
-            onChange={(v) => set("attachments", v)}
-          />
-        </Field>
-      </div>
-      <div className="span-2">
-        <Field label="備註">
-          <textarea
-            rows={3}
-            value={d.notes || ""}
-            onChange={(e) => set("notes", e.target.value)}
-          />
-        </Field>
-      </div>
-
-    </div>
-  );
-}
+import StageQueries from "./StageQueries";
+import { PartEditor } from "./StageFields";
 export function StageView({ stage }: { stage: any }) {
+  const resources = useQuery({
+    queryKey: ["resources"],
+    queryFn: () => api<Resource[]>("/resources"),
+  });
   if (!stage) return null;
   return (
-    <>
+    <Scope doc={bookingDoc(stage.kind)}>
       <span className="mono">
         {stage.id} · 父單 {stage.parent_id}
       </span>
-      {["start", "arrival"].map((part) => {
-        const d = stage.content[part];
-        return (
-          <section key={part} className="stage-view">
+      <fieldset
+        disabled
+        className="source-readonly-fieldset source-readonly-form"
+      >
+        {["start", "arrival"].map((part) => (
+          <section className="stage-view" key={part}>
             <h3>{part === "start" ? "出發紀錄" : "抵達紀錄"}</h3>
-            {d ? (
-              <>
-                <div className="summary-grid">
-                  {[
-                    ["車牌", d.plate],
-                    [
-                      "預約帶入時間",
-                      d.reservation_start ? dateTime(d.reservation_start) : "—",
-                    ],
-                    ["里程", d.mileage + " km"],
-                    ["階段提交時間", dateTime(d.submitted_at)],
-                    [
-                      "駕駛／副駕",
-                      [d.driver, d.codriver].filter(Boolean).join("／"),
-                    ],
-                    ["使用人員", d.employees?.join("、")],
-                    ["發車地點", d.place],
-                  ].map(([label, value]) => (
-                    <div key={label}>
-                      <small>{label}</small>
-                      <strong>{value || "—"}</strong>
-                    </div>
-                  ))}
-                </div>
-                {d.checks?.length > 0 && <p>檢查確認：{d.checks.join("、")}</p>}
-                {[
-                  ["tires", "輪胎"],
-                  ["interior", "車輛內部"],
-                  ["exterior", "車體外部"],
-                  ["equipment", "隨車設備"],
-                ].map(
-                  ([key, label]) =>
-                    d[key] && (
-                      <p key={key}>
-                        {label}：{d[key]} {d[key + "_note"]}
-                      </p>
-                    ),
-                )}
-                {d.anomalies?.map((a: string) => (
-                  <div className="review-detail" key={a}>
-                    <strong>{a}</strong>
-                    <span>
-                      {Object.values(d.anomaly_details?.[a] || {})
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </span>
-                  </div>
-                ))}
-                {photoFields.map(
-                  ([key, label]) =>
-                    d[key]?.length > 0 && (
-                      <div key={key}>
-                        <h4>{label}</h4>
-                        <FileUpload
-                          readOnly
-                          value={d[key]}
-                          onChange={() => {}}
-                        />
-                      </div>
-                    ),
-                )}
-                {"notes" in d && (
-                  <p className="preserve-lines">{d.notes || "無備註"}</p>
-                )}
-                <FileUpload
-                  readOnly
-                  value={d.attachments || []}
-                  onChange={() => {}}
-                />
-              </>
+            {stage.content[part] ? (
+              <PartEditor
+                data={stage.content[part]}
+                set={() => {}}
+                kind={stage.kind}
+                part={part}
+                resources={resources.data || []}
+                readOnly
+              />
             ) : (
               <p>尚未填寫抵達紀錄。</p>
             )}
           </section>
-        );
-      })}
-    </>
+        ))}
+      </fieldset>
+    </Scope>
   );
 }
+
 export function StageForm({
   open,
   close,
@@ -454,6 +123,17 @@ export function StageForm({
   const [data, setData] = useState<any>(initial()),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [uploads, setUploads] = useState<Record<string, boolean>>({}),
+    [draftMessage, setDraftMessage] = useState(""),
+    [baseline, setBaseline] = useState("");
+  const uploading = Object.values(uploads).some(Boolean);
+  const leaveGuard = useUnsavedChanges({
+    active: open,
+    dirty: JSON.stringify(data) !== baseline,
+    busy: busy || uploading,
+  });
+  const requestClose = () => leaveGuard.requestClose(close);
+  const draftKey = `polimax-stage-draft:${u.id}:${b.id}:${b.status}:${b.revision}`;
   const resources = useQuery({
     queryKey: ["resources"],
     queryFn: () => api<Resource[]>("/resources"),
@@ -464,22 +144,44 @@ export function StageForm({
         new URLSearchParams(location.search).get("resource"),
       );
       const ids = Array.from(new Set(b.slots.map((s) => s.resource_id)));
-      setData({
+      let startingData: any = {
         ...initial(),
         driver: u.name,
-        codriver: b.content.employees?.find((name: string) => name !== u.name) || "",
-        employees: [u.name, ...(b.content.employees || []).filter((name: string) => name !== u.name).slice(0, 1)],
+        codriver:
+          b.content.employees?.find((name: string) => name !== u.name) || "",
+        employees: [
+          u.name,
+          ...(b.content.employees || [])
+            .filter((name: string) => name !== u.name)
+            .slice(0, 1),
+        ],
         resource_id: ids.includes(preferred)
           ? preferred
           : ids.length === 1
             ? ids[0]
             : undefined,
-      });
+      };
       setError("");
+      setDraftMessage("");
+      try {
+        const draft = JSON.parse(sessionStorage.getItem(draftKey) || "null");
+        if (draft?.content && Date.now() - draft.saved < 24 * 60 * 60 * 1000) {
+          startingData = draft.content;
+          setDraftMessage("已載入此分頁的草稿，尚未提交。");
+        }
+      } catch {
+        /* Storage is optional; it never blocks the form. */
+      }
+      setData(startingData);
+      setBaseline(JSON.stringify(startingData));
     }
-  }, [open]);
+  }, [open, b.id, b.status, b.revision]);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (uploading) {
+      setError("請等候檔案上傳完成後再提交。");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -488,6 +190,12 @@ export function StageForm({
         revision: b.revision,
         content: data,
       });
+      try {
+        sessionStorage.removeItem(draftKey);
+      } catch {
+        /* Optional local draft. */
+      }
+      leaveGuard.release();
       await invalidate();
       close();
     } catch (e) {
@@ -500,7 +208,7 @@ export function StageForm({
     <Modal
       open={open}
       title={nextStates[b.status] || "車輛使用紀錄"}
-      onClose={() => !busy && close()}
+      onClose={requestClose}
       wide
     >
       <Scope
@@ -521,7 +229,7 @@ export function StageForm({
             <StageView stage={b.stages?.find((s) => s.kind === kind)} />
           </details>
         )}
-        <form onSubmit={submit}>
+        <form onSubmit={submit} className="source-stage-form">
           <PartEditor
             data={data}
             set={(k, v) => setData((d: any) => ({ ...d, [k]: v }))}
@@ -529,18 +237,48 @@ export function StageForm({
             part={part}
             booking={b}
             resources={resources.data || []}
+            onUploading={(key, value) =>
+              setUploads((v) => ({ ...v, [key]: value }))
+            }
           />
           <ErrorBox error={error || resources.error} />
-          <div className="actions">
+          {draftMessage && <p role="status">{draftMessage}</p>}
+          <div className="source-actions">
             <button
               type="button"
               className="button"
-              disabled={busy}
-              onClick={close}
+              disabled={busy || uploading}
+              onClick={requestClose}
             >
               取消
             </button>
-            <button className="button primary" disabled={busy || (kind === "B" && !canFillDeparture(u, b))}>
+            <button
+              type="button"
+              className="button"
+              disabled={busy || uploading}
+              onClick={() => {
+                try {
+                  sessionStorage.setItem(
+                    draftKey,
+                    JSON.stringify({ saved: Date.now(), content: data }),
+                  );
+                  setBaseline(JSON.stringify(data));
+                  setDraftMessage("草稿已保存在此瀏覽器分頁，尚未提交。");
+                } catch {
+                  setError(
+                    "此瀏覽器無法保存分頁草稿，請保持表單開啟或直接提交。",
+                  );
+                }
+              }}
+            >
+              儲存草稿
+            </button>
+            <button
+              className="button primary"
+              disabled={
+                busy || uploading || (kind === "B" && !canFillDeparture(u, b))
+              }
+            >
               {busy ? "保存中…" : "確認提交本階段"}
             </button>
           </div>
@@ -565,11 +303,24 @@ export function StagePage() {
     [data, setData] = useState<any>({}),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [uploads, setUploads] = useState<Record<string, boolean>>({});
+  const uploading = Object.values(uploads).some(Boolean);
+  const [baseline, setBaseline] = useState("");
+  const leaveGuard = useUnsavedChanges({
+    active: editing,
+    dirty: JSON.stringify(data) !== baseline,
+    busy: busy || uploading,
+  });
+  const requestClose = () => leaveGuard.requestClose(() => setEditing(false));
   if (query.isPending) return <Loading />;
   if (query.error) return <ErrorBox error={query.error} />;
   const s = query.data;
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (uploading) {
+      setError("請等候檔案上傳完成後再保存。");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -577,6 +328,7 @@ export function StagePage() {
         revision: s.revision,
         content: data,
       });
+      leaveGuard.release();
       await invalidate();
       setEditing(false);
     } catch (e) {
@@ -594,22 +346,30 @@ export function StagePage() {
         description="修正保留編號及舊版本，父單流程不倒退。"
         action={
           <div className="actions">
-            {can(u, bookingDoc(s.kind), "write") && (s.kind !== "B" || canFillDeparture(u, { owner: s.applicant_owner })) && (
-              <button
-                className="button"
-                onClick={() => {
-                  setData(structuredClone(s.content));
-                  setEditing(true);
-                }}
-              >
-                修正階段內容
-              </button>
-            )}
-            {can(u, bookingDoc(s.kind), "delete") && (s.kind !== "B" || canFillDeparture(u, { owner: s.applicant_owner })) && (
-              <button className="button danger" onClick={() => setRemove(true)}>
-                刪除階段
-              </button>
-            )}
+            {can(u, bookingDoc(s.kind), "write") &&
+              (s.kind !== "B" ||
+                canFillDeparture(u, { owner: s.applicant_owner })) && (
+                <button
+                  className="button"
+                  onClick={() => {
+                    setData(structuredClone(s.content));
+                    setBaseline(JSON.stringify(s.content));
+                    setEditing(true);
+                  }}
+                >
+                  修正階段內容
+                </button>
+              )}
+            {can(u, bookingDoc(s.kind), "delete") &&
+              (s.kind !== "B" ||
+                canFillDeparture(u, { owner: s.applicant_owner })) && (
+                <button
+                  className="button danger"
+                  onClick={() => setRemove(true)}
+                >
+                  刪除階段
+                </button>
+              )}
           </div>
         }
       />
@@ -626,13 +386,8 @@ export function StagePage() {
           </details>
         ))}
       </section>
-      <Modal
-        open={editing}
-        title="修正階段內容"
-        wide
-        onClose={() => !busy && setEditing(false)}
-      >
-        <form onSubmit={save}>
+      <Modal open={editing} title="修正階段內容" wide onClose={requestClose}>
+        <form onSubmit={save} className="source-stage-form">
           {["start", "arrival"]
             .filter((p) => data[p])
             .map((part) => (
@@ -649,6 +404,9 @@ export function StagePage() {
                   kind={s.kind}
                   part={part}
                   resources={resources.data || []}
+                  onUploading={(key, value) =>
+                    setUploads((v) => ({ ...v, [key]: value }))
+                  }
                 />
               </section>
             ))}
@@ -657,12 +415,12 @@ export function StagePage() {
             <button
               type="button"
               className="button"
-              onClick={() => setEditing(false)}
-              disabled={busy}
+              onClick={requestClose}
+              disabled={busy || uploading}
             >
               取消
             </button>
-            <button className="button primary" disabled={busy}>
+            <button className="button primary" disabled={busy || uploading}>
               {busy ? "保存中…" : "儲存修訂"}
             </button>
           </div>
@@ -692,6 +450,9 @@ export function StagePage() {
   );
 }
 export function StageList() {
+  return <StageQueries />;
+}
+function PreviousStageList() {
   const [params, setParams] = useSearchParams(),
     kind = params.get("kind") === "C" ? "C" : "B";
   const [search, setSearch] = useState(""),

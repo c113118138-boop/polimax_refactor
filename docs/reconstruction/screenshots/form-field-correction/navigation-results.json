@@ -1,0 +1,19 @@
+{
+  "passes": [
+    "A/D/E 未修改可離開；側欄／取消提示、繼續保留、放棄離開且不寫入",
+    "空白但尚未保存的明細編輯列仍受保護",
+    "瀏覽器返回／前進、取消原生刷新提示、未修改深層路由刷新",
+    "取消未保存登出不發送 POST；登出失敗保留內容與離頁保護",
+    "保存中禁止放棄；失敗保留保護；真實成功保存正常離頁",
+    "B 關閉／Esc 保護、儲存草稿可關閉、刷新回填與草稿後的新修改放棄",
+    "既有 B 階段修訂取消／繼續／放棄、重新開啟成功保存與 guard 清除",
+    "C 上傳中阻擋關閉；完成後可放棄，不推進主單流程",
+    "390px 手機選单跳頁確認、保留輸入且解除選單 inert",
+    "部分讀取／只有 C／零權限側欄、空群組隱藏、create 與 read 獨立、直接網址 guard 保留"
+  ],
+  "errors": [],
+  "assets": "/assets/index-DmWKTVu3.js",
+  "isolation": "Disposable SQLite; both AMS_DATA_DIR and PREVIEW_DATA_DIR; no production writes",
+  "mocked": "Failed save/logout, upload delay and UI auth/me permissions; all successful mutations use real preview API",
+  "nativeRefresh": "Chromium beforeunload dialog dismissed; input preserved"
+}

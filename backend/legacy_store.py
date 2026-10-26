@@ -19,6 +19,7 @@ from fastapi import HTTPException
 import geoalchemy2  # Registers PostGIS types for SQLAlchemy reflection.
 from sqlalchemy import MetaData, Table, select, insert, update, func, text, or_
 from legacy_schema import ASSETS, RECORDS, array
+from form_validation import detail_links
 
 TZ = timezone(timedelta(hours=8))
 FOLDERS = {'A':'主表','B':'發車紀錄表','C':'回程紀錄表','D':'工作間預約表','E':'儀器借用表'}
@@ -26,6 +27,21 @@ STATES = ['PENDING','DEPARTURE','DEPARTURE_ARRIVED','RETURN','RETURN_ARRIVED']
 REASONS = ['工案','材料送貨','新開發案','客戶拜訪','成交案回訪','參展','其他']
 E_REASONS = ['開案','成案（施工前量測）','成案（完工量測）','成案（服務回訪）','儀器設備保養／校正','儀器設備維修','其它']
 FIELD_MAP = json.loads(Path(__file__).with_name('legacy_form_fields.json').read_text())
+A_DETAIL_PEOPLE = {
+    '工案': ('reasonCaseGrid', 'reasonCaseGrid2'),
+    '材料送貨': ('', 'reasonMaterialDeliveringGrid'),
+    '新開發案': ('', 'reasonNewProjectGrid'),
+    '成交案回訪': ('reasonRecallGrid', 'reasonRecallGrid2'),
+}
+PURPOSE_FIELDS = dict(zip([
+    '廠內','廠外施工','廠外出差','量測','材料送貨','載回工件','送回工件','動平衡（去）','動平衡（回）',
+    '加工（去）','加工（回）','五金採買','廠務','工件備品採購','每月消耗品採購','其他','其他加工'
+], [
+    'Inside_factory','Maintaining_outside','outside_business_trip','Measuring','Material_delivering_in_requirement_options',
+    'TransportBackWorkpiece','DeliverBackWorkpiece','DynamicBalancing_outbound','DynamicBalancing_inbound',
+    'Processing_outbound','Processing_inbound','Hardware_Purchasing','Factory_business','WorkpieceSparePartsProcurement',
+    'MonthlyConsumables_Purchasing','Others_in_requirement_Options','Other_processing'
+]))
 # These are the fixed room choices in the existing form, not database assets.
 ROOMS = [('1F','批覆區','1-1'),('1F','批覆區','1-2'),('1F','拆組裝區','整區'),('1F','裝載區','整區'),
     ('1F','汞浦試壓區','整區'),('1F','噴砂室','整區'),('1F','研磨與氣動除鏽區','6-1'),
@@ -36,7 +52,8 @@ CHECKS_C=['車輛內部清潔','車輛內部物品歸位','車輛鑰匙歸位','
 ASSETS['vehicle'][4].update(phone='phone_number',license_files='license_file_uuid',vehicle_files='vehicle_data_file_uuid',contract_files='contract_file_uuid')
 RECORDS['insurance'][1].update(roadside='roadside_assistance',policy_files='policy_file_uuid',claim_files='claim_file_uuid')
 for cat,col in [('cost','upload_file'),('maintenance','attachment_uuids'),('garage','attachment_uuids')]: RECORDS[cat][1]['attachments']=col
-FILE_KEYS={'license_files','vehicle_files','contract_files','policy_files','claim_files','attachments'}
+EQUIPMENT_FILES={'manual_files':'manual_file_uuid','warranty_files':'warranty_file_uuid','purchase_files':'purchase_file_uuid'}
+FILE_KEYS={'license_files','vehicle_files','contract_files','policy_files','claim_files','attachments',*EQUIPMENT_FILES}
 
 def fail(message, status=422): raise HTTPException(status, message)
 def now(): return datetime.now(TZ).replace(tzinfo=None)
@@ -170,10 +187,17 @@ class Repository:
     def resources(self,include_deleted=False):
         result=[]
         for kind,(name,pk,label,deleted,fields) in ASSETS.items():
+            fields=self.asset_fields(kind)
             for row in self.rows(name):
                 if row[deleted] and not include_deleted:continue
-                result.append({**self.decode_fields(row,fields),'id':resource_id(kind,row[pk]),'kind':kind,
-                    'label':row[label] or f'{kind}-{row[pk]}','deleted':bool(row[deleted])})
+                decoded=self.decode_fields(row,fields)
+                if kind=='equipment':
+                    path=self.store.data/'equipment-files'/f'{row[pk]}.json'
+                    extra=json.loads(self.pending[path]) if path in self.pending else json.loads(path.read_text()) if path.exists() else {}
+                    for key in EQUIPMENT_FILES:
+                        if key not in decoded:decoded[key]=[self.store.attachment(v) for v in array(extra.get(key))]
+                result.append({**decoded,'id':resource_id(kind,row[pk]),'kind':kind,
+                    'source_id':row[pk],'label':row[label] or f'{kind}-{row[pk]}','deleted':bool(row[deleted])})
         fixed=[]
         for floor,area,unit in ROOMS:
             label=unit if re.fullmatch(r'\d-\d',unit) else area
@@ -188,6 +212,11 @@ class Repository:
         result=next((r for r in self.resources(include_deleted) if r['id']==rid),None)
         if not result:fail('找不到資產',404)
         return result
+    def asset_fields(self,kind):
+        fields=dict(ASSETS[kind][4])
+        if kind=='equipment':
+            fields.update({key:col for key,col in EQUIPMENT_FILES.items() if col in self.t['EquipmentList'].c})
+        return fields
     def encode_fields(self,data,fields):
         values={}
         for key,col in fields.items():
@@ -215,6 +244,7 @@ class Repository:
             parse(data['purchase_date'])
         elif data.get('state','列管') not in ('列管','不列管','停用'):fail('無效列管狀態')
         name,pk,labelcol,deleted,fields=ASSETS[kind];table=self.t[name]
+        fields=self.asset_fields(kind)
         source_id=rid//10 if rid else None
         if rid and self.resource(rid)['kind']!=kind:fail('不可變更資產類型')
         label=label or 'EQ-'+uuid.uuid4().hex[:12]
@@ -223,6 +253,12 @@ class Repository:
         values=self.encode_fields(data,fields);values[labelcol]=label
         if rid:self.c.execute(update(table).where(table.c[pk]==source_id).values(**values))
         else:source_id=self.c.execute(insert(table).values(**values)).inserted_primary_key[0]
+        if kind=='equipment':
+            path=self.store.data/'equipment-files'/f'{source_id}.json'
+            extra=json.loads(self.pending[path]) if path in self.pending else json.loads(path.read_text()) if path.exists() else {}
+            for key,col in EQUIPMENT_FILES.items():
+                if col not in table.c and key in data:extra[key]=data[key]
+            if extra:self.pending[path]=dump(extra).encode()
         return self.resource(resource_id(kind,source_id))
     def delete_resource(self,rid):
         r=self.resource(rid);kind=r['kind']
@@ -289,11 +325,17 @@ class Repository:
         details=[]
         config=FIELD_MAP['table'].get(reason,{})
         for detail in raw.get(config.get('grid_key',''),[]):
-            if isinstance(detail,dict):details.append({'name':detail.get(FIELD_MAP['reason_detail_field_map'].get(reason,'')) or detail.get('exhibit_name2') or '',
-                'city':detail.get(config.get('city_field',''),'') or '', 'district':detail.get(config.get('district_field',''),'') or ''})
+            if isinstance(detail,dict):
+                leader,sales=A_DETAIL_PEOPLE.get(reason,('',''))
+                details.append({'name':detail.get(FIELD_MAP['reason_detail_field_map'].get(reason,'')) or detail.get('exhibit_name2') or '',
+                    'city':detail.get(config.get('city_field',''),'') or '', 'district':detail.get(config.get('district_field',''),'') or '',
+                    'leader':detail.get(leader,'') or '', 'sales':array(detail.get(sales)), 'notes':detail.get('notes','') or ''})
         if not details:details=[{'name':(r['reason'] or '').partition(' - ')[2] or r['place'] or '', 'city':'','district':''} for r in rows]
         content.setdefault('details',details)
         content.setdefault('notes',raw.get('RequireOption_Memo',''))
+        content.setdefault('purposes',[label for label,key in PURPOSE_FIELDS.items() if raw.get(key) is True])
+        content.setdefault('other_purpose',raw.get('Others_comment_in_requirement_options',''))
+        content.setdefault('other_processing',raw.get('Other_Processing_comment',''))
         slots=[]
         for index,row in enumerate(rows):
             labels=room_labels(row['place']) if kind=='D' else [row['plate']]
@@ -361,6 +403,7 @@ class Repository:
             if not valid:fail('使用人數至少為 1')
             if len(details) not in (1,len(slots)):fail('明細與時段須一對一，或一筆明細對應多個時段')
         selected=[];resources=self.resources()
+        detail_links(content,kind)
         for index,slot in enumerate(slots):
             try:rid=int(slot['resource_id'])
             except (KeyError,ValueError,TypeError):fail('請選擇有效資源')
@@ -390,11 +433,16 @@ class Repository:
             for detail in content['details']:
                 grid={config['city_field']:detail.get('city',''),config['district_field']:detail.get('district','')}
                 grid[FIELD_MAP['reason_detail_field_map'].get(reason,'exhibit_name2')]=detail.get('name','')
+                leader,sales=A_DETAIL_PEOPLE.get(reason,('',''))
+                if leader:grid[leader]=detail.get('leader','')
+                if sales:grid[sales]=detail.get('sales',[])
                 grid[FIELD_MAP['employee_field_map'].get(reason,'employees')]=content.get('employees',[]);grids.append(grid)
             for slot in content['slots']:
                 resource=self.resource(slot['resource_id'],True)
                 times.append({config['plate_field']:resource['label'],config['start_field']:slot['start'],config['end_field']:slot['end']})
             raw[config['grid_key']]=grids;raw[config['time_key']]=times
+            raw.update({key:label in content.get('purposes',[]) for label,key in PURPOSE_FIELDS.items()})
+            raw.update(Others_comment_in_requirement_options=content.get('other_purpose',''),Other_Processing_comment=content.get('other_processing',''))
         elif kind=='D':
             chosen=[self.resource(s['resource_id']) for s in content['slots']]
             raw.update(panel2=content.get('applicant',''),panel3=content['slots'][0]['start'],panel6=content['slots'][0]['end'],

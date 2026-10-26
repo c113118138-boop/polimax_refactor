@@ -43,7 +43,7 @@ SSO 9 項與獨立部署 4 項測試通過；兩個網站 health 與 Admin 權�
 
 正式固定AMS_DATABASE_MODE=postgresql，POSTGRES_*指向目標正式庫，AMS_ARCHIVE_DATABASE指向獨立封存庫；正式SSO／PREVIEW_LOGIN_ENABLED=0。MySQL不需安裝或啟動；原始碼中的相容分支不作部署必要條件。
 
-搬機依[PostgreSQL runbook](../POSTGRESQL_CUTOVER_RUNBOOK.md)停所有寫入者、雙庫備份、還原業務檔案與配置、驗證後才切換入口與恢復排程。原機sso/session可不保留；FindMy session/cache需搬入或重新登入。
+搬機依[PostgreSQL runbook](../SYSTEM_MAINTENANCE_GUIDE.md#operations)停所有寫入者、雙庫備份、還原業務檔案與配置、驗證後才切換入口與恢復排程。原機sso/session可不保留；FindMy session/cache需搬入或重新登入。
 
 注意backup_postgresql.py目前只打包專案固定.data/responses、files、permissions、findmy以及env/.env。若用外部AMS_DATA_DIR、AMS_RESPONSES_DIR或政策路徑，必須另行一致備份與還原；檢查manifest與tar清單，不能因BACKUP_COMPLETE就假設自訂路徑已包含。
 

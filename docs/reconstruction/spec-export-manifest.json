@@ -1,0 +1,12 @@
+{
+  "document": "POLIMAX_REBUILD_SPEC.md",
+  "date": "2026-10-12",
+  "files": 120,
+  "document_bytes": 980565,
+  "bundle_sha256": "7962ec1fa06c4b990fc70821838a1709ec61713717d0a749afe60103ce8ee9a3",
+  "api_count": 58,
+  "source_bytes": 1365822,
+  "logo_sha256": "cf12e08949670143d60bfc790a38003e6b1dc02b9d92ae167092248784d5d64c",
+  "document_sha256": "33251ca80684eee1620eb5d8c2b6ebe9b59ecda4df395543013434ca4b052b55",
+  "restoration_verification": "passed; 120 files; identical build artifacts; 9 query groups"
+}

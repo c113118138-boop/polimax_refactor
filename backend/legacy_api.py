@@ -288,7 +288,7 @@ def create_app(root,data,url):
         meta_path=store().files/(ident+'.json');path=store().files/ident
         if not path.exists():fail('附件尚未搬入新版或不存在',404)
         if not meta_path.exists():fail('找不到附件資訊',404)
-        meta=json.loads(meta_path.read_text());safe=meta['mime'] in ('image/jpeg','image/png','image/webp','image/gif')
+        meta=json.loads(meta_path.read_text());safe=meta['mime'] in ('image/jpeg','image/png','image/webp','image/gif','application/pdf')
         return FileResponse(path,filename=meta['name'],media_type=meta['mime'] if safe else 'application/octet-stream',content_disposition_type='inline' if preview and safe else 'attachment')
     from legacy_integrations import install
     install(app,store,current,check)

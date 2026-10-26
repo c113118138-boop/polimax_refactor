@@ -97,8 +97,8 @@ curl -fsS http://127.0.0.1:5174/api/health
 systemctl --user list-timers
 ```
 
-health應回database=PostgreSQL。再驗證真SSO、角色、表單、附件、GPS／Beacon與FindMy。寫入驗收在隔離庫完成；demo通過不表示真上游成功。回復目前PostgreSQL與持久檔案版本，不能切回舊MySQL後忽略新資料。詳見[回復手冊](../POSTGRESQL_CUTOVER_RUNBOOK.md)。
+health應回database=PostgreSQL。再驗證真SSO、角色、表單、附件、GPS／Beacon與FindMy。寫入驗收在隔離庫完成；demo通過不表示真上游成功。回復目前PostgreSQL與持久檔案版本，不能切回舊MySQL後忽略新資料。詳見[回復手冊](../SYSTEM_MAINTENANCE_GUIDE.md#operations)。
 
 ## 7. 部署紀錄的閱讀方式
 
-2026-09-22正式切換PostgreSQL、2026-09-24封存啟用、2026-09-30獨立搬機盤點屬已紀錄事件，見[遷移紀錄](../POSTGRESQL_MIGRATION_BASELINE.md)。歷史曾接受的15個附件缺失不代表已補齊；實際以持久migration-report為準。本文更新未重啟服務或重新驗收正式主機。
+2026-09-22正式切換PostgreSQL、2026-09-24封存啟用、2026-09-30獨立搬機盤點屬已紀錄事件，見[遷移紀錄](../SYSTEM_MAINTENANCE_GUIDE.md#history)。歷史曾接受的15個附件缺失不代表已補齊；實際以持久migration-report為準。本文更新未重啟服務或重新驗收正式主機。

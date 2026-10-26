@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .data/
+.preview/
 __pycache__/
 *.log
 .env

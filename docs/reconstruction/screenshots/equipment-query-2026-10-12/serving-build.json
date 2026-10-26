@@ -1,0 +1,17 @@
+[
+  {
+    "port": 5173,
+    "javascript": "index-CpYRgmil.js",
+    "css": "index-gkof4Rkh.css"
+  },
+  {
+    "port": 5174,
+    "javascript": "index-CpYRgmil.js",
+    "css": "index-gkof4Rkh.css"
+  },
+  {
+    "port": 18024,
+    "javascript": "index-CpYRgmil.js",
+    "css": "index-gkof4Rkh.css"
+  }
+]

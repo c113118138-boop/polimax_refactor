@@ -1,5 +1,15 @@
 # polimax_refactor 現行驗收與測試範圍
 
+2026-10-11 原站其餘頁面驗收見 [SITE_PARITY_ACCEPTANCE](docs/reconstruction/SITE_PARITY_ACCEPTANCE.md)。`test:site-parity`驗證原欄序、350px定位面板／右側手機抽屜、儀器三類文件、CRUD与自製彈窗；`test:asset-files`驗證正式相容 repository 的有／無文件欄位保存及交易失敗回滾。原站像素、正式DB／SSO與真定位仍另驗。
+
+2026-10-10 主畫面分段驗收見 [MAIN_SCREEN_ACCEPTANCE](docs/reconstruction/MAIN_SCREEN_ACCEPTANCE.md)；接續ABCDE借用表單驗收見 [FORM_ACCEPTANCE](docs/reconstruction/FORM_ACCEPTANCE.md)，布局依 [FORM_LAYOUT_SPEC](docs/reconstruction/FORM_LAYOUT_SPEC.md)。`npm run test:forms`覆蓋七種A需求、七種E類別、D區域、B/C照片與草稿；`npm run test:calendar`保留主畫面回歸。隔離檢查不替代正式SSO／DB及原站逐像素比對。
+
+接續側邊欄驗收見 [SIDEBAR_ACCEPTANCE](docs/reconstruction/SIDEBAR_ACCEPTANCE.md)，涵蓋来源群組／巢狀清單、固定底部、權限入口、URL帶值與手機抽屜；指令`npm run test:sidebar`。
+
+接續離頁安全及側欄 read 權限驗收見 [NAVIGATION_SAFETY_ACCEPTANCE](docs/reconstruction/NAVIGATION_SAFETY_ACCEPTANCE.md)。`npm run test:navigation`涵蓋跳頁／返回／刷新、B/C關閉與草稿、保存及上傳中保護、登出取消、部分讀取及空群組；正式SSO／資料庫仍另行驗收。
+
+接續車輛／作業區查詢排版與多時段操作驗證見 [QUERY_ACCEPTANCE](docs/reconstruction/QUERY_ACCEPTANCE.md)，獨立布局見 [QUERY_LAYOUT_SPEC](docs/reconstruction/QUERY_LAYOUT_SPEC.md)。`npm run test:queries`使用18029一次性資料，包含來源欄序、動態篩選、合併、階段保存、D編輯／刪除、權限及代表寬度；正式資料相容仍以正式驗收為準。
+
 > 專案名稱與路徑更新：2026-10-07。專案名稱為 `polimax_refactor`，本機目錄為 `/home/c113118138/polimax_refactor`。
 
 更新：2026-10-05。正式架構為React／FastAPI／PostgreSQL／PostGIS／公司SSO，本地JSON及附件持久保存。SQLite僅是隔離demo，MySQL不再是正式驗收環境。

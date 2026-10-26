@@ -1,0 +1,145 @@
+{
+  "captured_at": "2026-10-11T23:18:47+08:00",
+  "original_live_pages_verified": false,
+  "scope": "Visible original pages; login, English eyebrows, intro copy, decorative icons excepted by user; working permissions/routing/persistence retained",
+  "artifacts": [
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/components/MainContent/MainContent.jsx",
+      "bytes": 18813,
+      "sha256": "42ae8606c9e9cc8d6cd929c68a147fdc261fe49afea1888b662be0465c60ae3a",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/components/MainContent/FormioEditor.jsx",
+      "bytes": 26942,
+      "sha256": "a7acd8cb08ba463032cefe416ea20d4bd11616e64e001f5a30a4b8d7313c0b7a",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/components/Sidebar/Sidebar.jsx",
+      "bytes": 26858,
+      "sha256": "3de7364d1507bfb2535230ea7c41142c8e7d88bbcae0fd1bccddc894fa246a0c",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/formio/Submission_query.jsx",
+      "bytes": 28830,
+      "sha256": "e583ef429322425b3d474048a1d313d7280b25f5986dcb2bd5ce1b674aed384a",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/formio/Room_query.jsx",
+      "bytes": 7222,
+      "sha256": "5e8ff368ec1e3a27fd15b0ed9ab5954a9fba146596c3830cc0195a9dbd65e1e4",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/formio/Departure_query.jsx",
+      "bytes": 12127,
+      "sha256": "79712ed50c7a815b6f4f4673d2262d2b34593363641f790f0269f0ef2c6adc07",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/formio/Back_query.jsx",
+      "bytes": 12035,
+      "sha256": "2059124af9ce3b2663e389f1e73f48d84f8adc54e9fbb3d14831ad96d5d34c86",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/formio/HistoryRecords.jsx",
+      "bytes": 26794,
+      "sha256": "6dbd851d9d369ff6e59b09ec1c1f0a38ce2ced168d365106ed9d9d7b52857eb7",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Backstage/Information.jsx",
+      "bytes": 12256,
+      "sha256": "6a3ba98bbc0728c50e0a83b6f66c92ac2caed0bb9ac398b2d0d364176b23a027",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Backstage/VehicleManagement.jsx",
+      "bytes": 2382,
+      "sha256": "bac66cf6ca0e8a0a5cb10037b4e90b6ffa8f6f384d9f49f8ad71cb1761ae0b60",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Backstage/EquipmentManagement.jsx",
+      "bytes": 1315,
+      "sha256": "102ba8b0f66c754f09e5033a605f156056fdddaf667a4a874a170f89da48204d",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Backstage/Carinformation.jsx",
+      "bytes": 24648,
+      "sha256": "d7ad72c6b8f2c71e30651c7e4bb4095be84850e02136d64c65d76dfd0abd2e90",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Backstage/EquipmentInformation.jsx",
+      "bytes": 23463,
+      "sha256": "a90daeb761db0316b59d61c8a4ef95f19e3b066a0dbc0a8984a1ae8d6f1066b2",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Backstage/Insurance.jsx",
+      "bytes": 22423,
+      "sha256": "2e2477094e8a22d18c428cb204d61b49adfcd330c9b28ca812dc0f78138e378c",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Backstage/Cost.jsx",
+      "bytes": 23063,
+      "sha256": "e68ab89e46458b93dca4cc822a637821c2d1d1c9e27aca9a09dcc2f1203e09dc",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Backstage/MaintenanceSystem.jsx",
+      "bytes": 29092,
+      "sha256": "955a51a87b615db67891fb61d119a1e5316b196d138c0c29052b1114a68b0bbd",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Backstage/AddCarDialog.jsx",
+      "bytes": 18008,
+      "sha256": "957e91ca7ad896f859308d974bf01d93a02fd2f7114f4f5092d3c8ae2db6e0fe",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Backstage/AddEquipmentDialog.jsx",
+      "bytes": 34823,
+      "sha256": "61cae2215f780fdc6e81eb6e3a697db3fd8e8232923995086ee489e0f1a2652c",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Map/CarMap.jsx",
+      "bytes": 13973,
+      "sha256": "a819304097201c61f3ebd8c0ab03c2ecac780b5d591673c6b81687f11291450e",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Map/CarUpdate.jsx",
+      "bytes": 20624,
+      "sha256": "2713fb0fa163476ffb72e8ae9ca4f0de12aeaa054f9ce73909d5e7ce86b2f630",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Map/FindMy.jsx",
+      "bytes": 16671,
+      "sha256": "ae5d60e7b33fdf5e7ab203e52dca45c77963b181ad4175164f6f7ea4c88a79bc",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_react_on/src/pages/BorrowManagement/Map/Latest_Device_Table.jsx",
+      "bytes": 14435,
+      "sha256": "fed5485021949b58909b675adb75956aae408d06eb2953e56e7e601c3af636d4",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    },
+    {
+      "research_path": "/home/c113118138/polimax_carAPI_on/app.py",
+      "bytes": 137370,
+      "sha256": "cb2227312a1c2f049c195163458b293bb4e8dcf0c1e38b012ad49a816a82292f",
+      "kind": "static_source_review_not_original_rendered_screenshot"
+    }
+  ]
+}

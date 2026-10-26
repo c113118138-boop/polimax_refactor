@@ -7,9 +7,18 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test:browser": "node tests/browser.mjs",
+    "test:calendar": "node tests/calendar.mjs",
+    "preview:main": "node scripts/preview-main.mjs",
+    "test:forms": "node tests/forms.mjs",
+    "preview:forms": "node scripts/preview-forms.mjs",
     "start": ".venv/bin/python -m uvicorn app:app --app-dir backend --host 0.0.0.0 --port 5173",
     "test:api": ".venv/bin/python tests/test_integration.py",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test:sidebar": "node tests/sidebar.mjs",
+    "test:navigation": "node tests/navigation.mjs",
+    "test:queries": "node tests/queries.mjs",
+    "test:site-parity": "node tests/site-parity.mjs",
+    "test:asset-files": ".venv/bin/python tests/test_asset_files.py"
   },
   "dependencies": {
     "@emotion/react": "^11.13.0",

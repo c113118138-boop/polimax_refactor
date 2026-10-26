@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-12",
+  "checks": [
+    {
+      "role": "admin",
+      "links": [
+        "BeaconList",
+        "CarList",
+        "EquipmentList"
+      ],
+      "directRouteRefresh": true,
+      "mobileRemoved": true
+    },
+    {
+      "role": "viewer",
+      "links": [
+        "BeaconList",
+        "CarList",
+        "EquipmentList"
+      ]
+    },
+    {
+      "role": "Administration-only UI fixture",
+      "backendGroupHidden": true
+    }
+  ],
+  "archiveRequests": [],
+  "errors": [],
+  "businessDataWrites": false
+}

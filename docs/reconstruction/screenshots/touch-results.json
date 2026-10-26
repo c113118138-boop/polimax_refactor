@@ -1,0 +1,8 @@
+{
+  "passes": [
+    "Real touch input opens selected 20:00–20:30",
+    "Mobile resource grid scrolls internally without page overflow",
+    "Zero-access date click shows permission error; no data or notification calls"
+  ],
+  "errors": []
+}

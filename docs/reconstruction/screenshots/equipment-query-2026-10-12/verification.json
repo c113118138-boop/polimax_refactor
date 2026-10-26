@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-12",
+  "sidebarLinks": [
+    "車輛使用查詢",
+    "作業區使用查詢",
+    "儀器使用查詢",
+    "發車紀錄查詢",
+    "還車紀錄查詢"
+  ],
+  "headerBackground": "rgb(240, 240, 240)",
+  "mobile": {
+    "overflow": 0,
+    "tableWidth": 350,
+    "scrollWidth": 1201
+  },
+  "errors": [],
+  "dataWrites": false
+}

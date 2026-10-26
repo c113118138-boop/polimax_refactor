@@ -1,6 +1,11 @@
-import { createContext, useContext, useState } from "react";
 import {
-  NavLink,
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import {
   Route,
   Routes,
   useLocation,
@@ -13,61 +18,30 @@ import {
   CalendarDays,
   CarFront,
   Layers,
-  MapPin,
-  Radio,
   Telescope,
   LogOut,
   Menu,
   ChevronDown,
   Plus,
-  ClipboardList,
   Building2,
   ShieldCheck,
   PanelLeftClose,
-  X,
   ArrowUpRight,
 } from "lucide-react";
 import { api, queryClient, User } from "./api";
 import { ErrorBox, Loading, Modal } from "./ui";
 import CalendarPage from "./Calendar";
+import Sidebar from "./Sidebar";
+import { useLeaveConfirmation } from "./NavigationGuard";
 import { BookingForm, BookingList, BookingDetail } from "./Bookings";
 import { Assets, AssetDetail } from "./Assets";
 import { Positions, Scans, FindMy } from "./Maps";
 import { StageList, StagePage } from "./Stages";
 import { Beacons, Integrations } from "./Admin";
 import Archive from "./Archive";
-import { Guard, can, hasWorkspaceAccess } from "./Access";
+import { Guard, can, hasWorkspaceAccess, bookingDoc } from "./Access";
 const UserContext = createContext<User>(null!);
 export const useUser = () => useContext(UserContext);
-const nav = [
-  {
-    title: "工作空間",
-    items: [
-      ["/", "預約日曆", CalendarDays],
-      ["/bookings", "借用紀錄", ClipboardList],
-      ["/stages", "出回程紀錄", ClipboardList],
-      ["/bookings?history=1", "車輛使用歷史", ClipboardList],
-    ],
-  },
-  {
-    title: "資產管理",
-    items: [
-      ["/vehicles", "公務車輛", CarFront],
-      ["/equipment", "儀器設備", Telescope],
-      ["/beacons", "Beacon 清單", Radio],
-    ],
-  },
-  {
-    title: "定位與資訊",
-    items: [
-      ["/positions", "最新位置", MapPin],
-      ["/scans", "場內掃描", Radio],
-      ["/findmy", "Beacon 設備位置", MapPin],
-      ["/integrations", "資料來源與通知", ShieldCheck],
-      ["/archive", "歷史封存", ClipboardList],
-    ],
-  },
-];
 export default function App() {
   const me = useQuery({
     queryKey: ["me"],
@@ -82,18 +56,33 @@ export default function App() {
   );
 }
 function Login() {
-  const auth = useQuery({ queryKey: ["auth-config"], queryFn: () => api("/auth/config") });
+  const auth = useQuery({
+    queryKey: ["auth-config"],
+    queryFn: () => api("/auth/config"),
+  });
   const demo = ["test", "demo"].includes(auth.data?.mode);
   const [role, setRole] = useState("admin"),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(new URLSearchParams(window.location.search).get("sso_error") || "");
+    [error, setError] = useState(
+      new URLSearchParams(window.location.search).get("sso_error") || "",
+    );
   const navigate = useNavigate();
   async function login() {
     if (!demo) {
-      const returnTo = window.location.pathname + (window.location.search.includes("sso_error") ? "" : window.location.search);
+      const returnTo =
+        window.location.pathname +
+        (window.location.search.includes("sso_error")
+          ? ""
+          : window.location.search);
       setBusy(true);
-      const retry = new URLSearchParams(window.location.search).has("sso_error");
-      window.location.assign("/api/auth/sso?return_to=" + encodeURIComponent(returnTo) + (retry ? "&retry=1" : ""));
+      const retry = new URLSearchParams(window.location.search).has(
+        "sso_error",
+      );
+      window.location.assign(
+        "/api/auth/sso?return_to=" +
+          encodeURIComponent(returnTo) +
+          (retry ? "&retry=1" : ""),
+      );
       return;
     }
     setBusy(true);
@@ -145,31 +134,45 @@ function Login() {
       </div>
       <div className="login-form">
         <div className="login-card">
-          <span className="pill">{demo ? "互動預覽 · 測試環境" : "POLIMAX · 公司帳號登入"}</span>
+          <span className="pill">
+            {demo ? "互動預覽 · 測試環境" : "POLIMAX · 公司帳號登入"}
+          </span>
           <h1>歡迎回來</h1>
-          <p>{demo ? "選擇測試身分，探索新的資源管理工作空間。" : "使用公司 SSO 帳號登入資源管理工作空間。"}</p>
-          {demo && <div className="role-list">
-            {[
-              ["admin", "管理員", "完整管理、借用與資料維護"],
-              ["borrower", "借用人", "建立預約、填寫車輛使用紀錄"],
-              ["viewer", "唯讀使用者", "查看記錄；備註及假日切換受限"],
-              ["draft", "草稿測試員", "可開啟新增表單，但無送出權限"],
-            ].map(([id, label, desc]) => (
-              <button
-                key={id}
-                className={"role-option " + (role === id ? "selected" : "")}
-                onClick={() => setRole(id)}
-              >
-                <ShieldCheck size={22} />
-                <span>
-                  <strong>{label}</strong>
-                  <small>{desc}</small>
-                </span>
-                <i />
-              </button>
-            ))}
-          </div>}
-          <ErrorBox error={error || auth.error || (auth.data && !auth.data.configured ? "SSO 設定尚未完成" : null)} />
+          <p>
+            {demo
+              ? "選擇測試身分，探索新的資源管理工作空間。"
+              : "使用公司 SSO 帳號登入資源管理工作空間。"}
+          </p>
+          {demo && (
+            <div className="role-list">
+              {[
+                ["admin", "管理員", "完整管理、借用與資料維護"],
+                ["borrower", "借用人", "建立預約、填寫車輛使用紀錄"],
+                ["viewer", "唯讀使用者", "查看記錄；備註及假日切換受限"],
+                ["draft", "草稿測試員", "可開啟新增表單，但無送出權限"],
+              ].map(([id, label, desc]) => (
+                <button
+                  key={id}
+                  className={"role-option " + (role === id ? "selected" : "")}
+                  onClick={() => setRole(id)}
+                >
+                  <ShieldCheck size={22} />
+                  <span>
+                    <strong>{label}</strong>
+                    <small>{desc}</small>
+                  </span>
+                  <i />
+                </button>
+              ))}
+            </div>
+          )}
+          <ErrorBox
+            error={
+              error ||
+              auth.error ||
+              (auth.data && !auth.data.configured ? "SSO 設定尚未完成" : null)
+            }
+          />
           <button
             className="button primary login-submit"
             onClick={login}
@@ -179,7 +182,9 @@ function Login() {
             <ArrowRight size={18} />
           </button>
           <div className="login-note">
-            {demo ? "此入口採本地測試登入。" : "登入後依你的 AMS 權限顯示可使用的功能。"}
+            {demo
+              ? "此入口採本地測試登入。"
+              : "登入後依你的 AMS 權限顯示可使用的功能。"}
           </div>
         </div>
         <small className="login-footer">
@@ -208,17 +213,20 @@ function Shell() {
     location = useLocation(),
     navigate = useNavigate();
   const hasAccess = hasWorkspaceAccess(u);
-  const archiveStatus = useQuery({
-    queryKey: ["archive-status"],
-    queryFn: () => api<{ enabled: boolean }>("/archive/status"),
-    enabled: can(u, "Administration"),
-    retry: false,
-  });
+  const { confirmLeave, releaseAll } = useLeaveConfirmation();
+  const [loggingOut, setLoggingOut] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() =>
+      window.dispatchEvent(new Event("resize")),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [collapsed]);
   const [mobile, setMobile] = useState(false),
     [create, setCreate] = useState(false),
     [logout, setLogout] = useState(false),
     [logoutError, setLogoutError] = useState("");
+  const closeSidebar = useCallback(() => setMobile(false), []);
   const title =
     location.pathname === "/"
       ? "預約日曆"
@@ -232,83 +240,31 @@ function Shell() {
               ? "場內掃描"
               : "借用管理";
   return (
-    <div className={"app-shell" + (collapsed ? " sidebar-collapsed" : "")}>
-      <div
-        className={"sidebar-shade " + (mobile ? "visible" : "")}
-        onClick={() => setMobile(false)}
+    <div
+      className={
+        "app-shell reconstruction-shell" +
+        (location.pathname === "/" ? " calendar-shell" : "") +
+        (collapsed ? " sidebar-collapsed" : "")
+      }
+    >
+      <Sidebar
+        user={u}
+        mobileOpen={mobile}
+        collapsed={collapsed}
+        onClose={closeSidebar}
+        onLogout={() => {
+          setLogoutError("");
+          setLogout(true);
+          setMobile(false);
+        }}
       />
-      <aside className={"sidebar " + (mobile ? "is-open" : "")}>
-        <Brand />
-        <button className="workspace">
-          <div className="workspace-icon">
-            <Building2 size={19} />
-          </div>
-          <span>
-            企業資源管理<small>POLIMAX 工作空間</small>
-          </span>
-          <ChevronDown size={15} />
-        </button>
-        <nav>
-          {nav.map((group) => (
-            <div className="nav-group" key={group.title}>
-              <div className="nav-label">{group.title}</div>
-              {group.items
-                .filter(
-                  ([path]: any) =>
-                    (!["/integrations", "/archive"].includes(path as string) || can(u, "Administration")) &&
-                    (path !== "/archive" || archiveStatus.data?.enabled),
-                )
-                .map(([path, label, Icon]: any) => (
-                  <NavLink
-                    key={path}
-                    to={path}
-                    end={path === "/"}
-                    onClick={() => setMobile(false)}
-                    className={({ isActive }) =>
-                      "nav-item " +
-                      (isActive &&
-                      (path.startsWith("/bookings")
-                        ? location.search.includes("history") ===
-                          path.includes("history")
-                        : true)
-                        ? "active"
-                        : "")
-                    }
-                  >
-                    <Icon size={19} />
-                    <span>{label}</span>
-                    {path === "/" && <span className="nav-dot" />}
-                  </NavLink>
-                ))}
-            </div>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="environment">
-            <i />
-            <span>
-              POLIMAX AMS<small>公司資源管理</small>
-            </span>
-            <ArrowUpRight size={15} />
-          </div>
-          <button className="user-card" onClick={() => setLogout(true)}>
-            <div className="avatar">{u.name.slice(0, 1)}</div>
-            <span>
-              <strong>{u.name}</strong>
-              <small>
-                {u.email} · {u.id}
-              </small>
-            </span>
-            <LogOut size={17} />
-          </button>
-        </div>
-      </aside>
       <div className="main-shell">
         <header className="topbar">
           <div className="breadcrumb">
             <button
               className="icon-button mobile-menu"
               aria-label="開啟選單"
+              aria-expanded={mobile}
               onClick={() => setMobile(true)}
             >
               <Menu size={22} />
@@ -325,8 +281,22 @@ function Shell() {
             <strong>{title}</strong>
           </div>
           <div className="topbar-right">
+            {location.pathname === "/" &&
+              ["A", "D", "E"].some((kind) =>
+                can(u, bookingDoc(kind), "create"),
+              ) && (
+                <button
+                  className="button compact calendar-create"
+                  onClick={() => setCreate(true)}
+                >
+                  <Plus size={17} />
+                  <span>新增預約</span>
+                </button>
+              )}
             <div className="account-summary" aria-label="目前使用者">
-              <div className="avatar small" aria-hidden="true">{u.name.slice(0, 1)}</div>
+              <div className="avatar small" aria-hidden="true">
+                {u.name.slice(0, 1)}
+              </div>
               <div className="account-details">
                 <span className="account-caption">目前使用者</span>
                 <strong title={u.name}>{u.name}</strong>
@@ -335,7 +305,10 @@ function Shell() {
             </div>
             <button
               className="button compact account-logout"
-              onClick={() => { setLogoutError(""); setLogout(true); }}
+              onClick={() => {
+                setLogoutError("");
+                setLogout(true);
+              }}
               aria-label="登出"
             >
               <LogOut size={17} aria-hidden="true" />
@@ -348,101 +321,112 @@ function Shell() {
             <section className="panel detail-content">
               <h2>沒有權限</h2>
               <p>此帳號尚未取得 AMS 功能權限。</p>
-              <button className="button" onClick={() => navigate("/")}>返回首頁</button>
+              <button className="button" onClick={() => navigate("/")}>
+                返回首頁
+              </button>
             </section>
-          ) : <Routes>
-            <Route path="/archive" element={<Guard doc="Administration"><Archive /></Guard>} />
-            <Route
-              path="/"
-              element={<CalendarPage onCreate={() => setCreate(true)} />}
-            />
-            <Route path="/bookings" element={<BookingList onCreate={() => setCreate(true)} />} />
-            <Route path="/bookings/new/:kind" element={<BookingForm />} />
-            <Route path="/bookings/:id/edit" element={<BookingForm />} />
-            <Route path="/bookings/:id" element={<BookingDetail />} />
-            <Route
-              path="/vehicles"
-              element={
-                <Guard doc="VehicleManagement">
-                  <Assets kind="vehicle" />
-                </Guard>
-              }
-            />
-            <Route
-              path="/vehicles/:id"
-              element={
-                <Guard doc="VehicleManagement">
-                  <AssetDetail />
-                </Guard>
-              }
-            />
-            <Route
-              path="/equipment"
-              element={
-                <Guard doc="EquipmentManagement">
-                  <Assets kind="equipment" />
-                </Guard>
-              }
-            />
-            <Route
-              path="/equipment/:id"
-              element={
-                <Guard doc="EquipmentManagement">
-                  <AssetDetail />
-                </Guard>
-              }
-            />
-            <Route
-              path="/positions"
-              element={
-                <Guard doc="CarUpdate">
-                  <Positions />
-                </Guard>
-              }
-            />
-            <Route
-              path="/findmy"
-              element={
-                <Guard doc="FindMy">
-                  <FindMy />
-                </Guard>
-              }
-            />
-            <Route
-              path="/beacons"
-              element={
-                <Guard doc="BeaconList">
-                  <Beacons />
-                </Guard>
-              }
-            />
-            <Route
-              path="/integrations"
-              element={
-                <Guard doc="Administration">
-                  <Integrations />
-                </Guard>
-              }
-            />
-            <Route
-              path="/stages"
-              element={
-                <Guard doc="Departure_query">
-                  <StageList />
-                </Guard>
-              }
-            />
-            <Route path="/stages/:id" element={<StagePage />} />
-            <Route
-              path="/scans"
-              element={
-                <Guard doc="Latest_Device">
-                  <Scans />
-                </Guard>
-              }
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>}
+          ) : (
+            <Routes>
+              <Route
+                path="/archive"
+                element={
+                  <Guard doc="Administration">
+                    <Archive />
+                  </Guard>
+                }
+              />
+              <Route path="/" element={<CalendarPage />} />
+              <Route
+                path="/bookings"
+                element={<BookingList onCreate={() => setCreate(true)} />}
+              />
+              <Route path="/bookings/new/:kind" element={<BookingForm />} />
+              <Route path="/bookings/:id/edit" element={<BookingForm />} />
+              <Route path="/bookings/:id" element={<BookingDetail />} />
+              <Route
+                path="/vehicles"
+                element={
+                  <Guard doc="VehicleManagement">
+                    <Assets kind="vehicle" />
+                  </Guard>
+                }
+              />
+              <Route
+                path="/vehicles/:id"
+                element={
+                  <Guard doc="VehicleManagement">
+                    <AssetDetail />
+                  </Guard>
+                }
+              />
+              <Route
+                path="/equipment"
+                element={
+                  <Guard doc="EquipmentManagement">
+                    <Assets kind="equipment" />
+                  </Guard>
+                }
+              />
+              <Route
+                path="/equipment/:id"
+                element={
+                  <Guard doc="EquipmentManagement">
+                    <AssetDetail />
+                  </Guard>
+                }
+              />
+              <Route
+                path="/positions"
+                element={
+                  <Guard doc="CarUpdate">
+                    <Positions key={location.search} />
+                  </Guard>
+                }
+              />
+              <Route
+                path="/findmy"
+                element={
+                  <Guard doc="FindMy">
+                    <FindMy />
+                  </Guard>
+                }
+              />
+              <Route
+                path="/beacons"
+                element={
+                  <Guard doc="BeaconList">
+                    <Beacons />
+                  </Guard>
+                }
+              />
+              <Route
+                path="/integrations"
+                element={
+                  <Guard doc="Administration">
+                    <Integrations />
+                  </Guard>
+                }
+              />
+              <Route
+                path="/stages"
+                element={
+                  <Guard doc="Departure_query">
+                    <StageList />
+                  </Guard>
+                }
+              />
+              <Route path="/stages/:id" element={<StagePage />} />
+              <Route
+                path="/scans"
+                element={
+                  <Guard doc="Latest_Device">
+                    <Scans />
+                  </Guard>
+                }
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          )}
         </main>
         <footer className="app-footer">
           <span>POLIMAX · 讓資源管理更有條理</span>
@@ -458,50 +442,66 @@ function Shell() {
             ["A", "車輛借用", "公務用車與完整出回程紀錄", CarFront],
             ["D", "租用作業區", "施工區、會議室與辦公空間", Building2],
             ["E", "儀器借用", "量測、保養與設備使用安排", Telescope],
-          ].map(([k, name, desc, Icon]: any) => (
-            <button
-              key={k}
-              onClick={() => {
-                setCreate(false);
-                navigate("/bookings/new/" + k);
-              }}
-            >
-              <div className={"resource-icon type-" + k}>
-                <Icon size={24} />
-              </div>
-              <span>
-                <strong>{name}</strong>
-                <small>{desc}</small>
-              </span>
-              <ArrowRight size={19} />
-            </button>
-          ))}
+          ]
+            .filter(([kind]) => can(u, bookingDoc(String(kind)), "create"))
+            .map(([k, name, desc, Icon]: any) => (
+              <button
+                key={k}
+                onClick={() => {
+                  setCreate(false);
+                  navigate("/bookings/new/" + k);
+                }}
+              >
+                <div className={"resource-icon type-" + k}>
+                  <Icon size={24} />
+                </div>
+                <span>
+                  <strong>{name}</strong>
+                  <small>{desc}</small>
+                </span>
+                <ArrowRight size={19} />
+              </button>
+            ))}
         </div>
       </Modal>
       <Modal
         open={logout}
         title="登出工作空間"
-        onClose={() => setLogout(false)}
+        onClose={() => !loggingOut && setLogout(false)}
       >
         <p>確定要登出 {u.name} 的帳號嗎？</p>
         <ErrorBox error={logoutError} />
         <div className="actions">
-          <button className="button" onClick={() => setLogout(false)}>
+          <button
+            className="button"
+            disabled={loggingOut}
+            onClick={() => setLogout(false)}
+          >
             取消
           </button>
           <button
             className="button primary"
-            onClick={async () => {
-              try {
-                const result = await api("/auth/logout", "POST");
-                queryClient.clear();
-                if (result.logout_url) { window.location.assign(result.logout_url); return; }
-                navigate("/");
-                window.location.reload();
-              } catch (e) {
-                setLogoutError((e as Error).message);
-              }
-            }}
+            disabled={loggingOut}
+            onClick={() =>
+              confirmLeave(async () => {
+                setLoggingOut(true);
+                try {
+                  const result = await api("/auth/logout", "POST");
+                  releaseAll();
+                  queryClient.clear();
+                  if (result.logout_url) {
+                    window.location.assign(result.logout_url);
+                    return;
+                  }
+                  navigate("/");
+                  window.location.reload();
+                } catch (e) {
+                  setLogoutError((e as Error).message);
+                } finally {
+                  setLoggingOut(false);
+                }
+              })
+            }
           >
             確認登出
           </button>

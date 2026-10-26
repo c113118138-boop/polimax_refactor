@@ -1,0 +1,377 @@
+{
+  "passes": [
+    "1440 / 900 / 769 / 768 / 390 geometry, breakpoint and page overflow",
+    "sidebar collapse, month navigation, today and mini-calendar sync in Los Angeles timezone",
+    "vehicle expand/collapse, all/select individual, chip remove and retained selection",
+    "four calendar views retain selected date and filters; holiday toggle",
+    "A/D/E saved-readback, resource-day timing, event detail, workshop and E filtering",
+    "resource/time selection prefills reconstructed A form",
+    "direct route refresh, mobile filter drawer/Esc/focus return and sidebar navigation",
+    "read-only user has no create, holiday toggle or resource selection access"
+  ],
+  "geometry": [
+    {
+      "width": 1440,
+      "scrollWidth": 1440,
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 250,
+        "height": 1000
+      },
+      "topbar": {
+        "x": 250,
+        "y": 0,
+        "width": 1190,
+        "height": 85
+      },
+      "calendar": {
+        "x": 250,
+        "y": 85,
+        "width": 890,
+        "height": 915
+      },
+      "filter": {
+        "x": 1140,
+        "y": 85,
+        "width": 300,
+        "height": 915
+      },
+      "mini": {
+        "x": 1157,
+        "y": 149,
+        "width": 267,
+        "height": 234
+      },
+      "toolbar": {
+        "x": 250,
+        "y": 85,
+        "width": 890,
+        "height": 64
+      }
+    },
+    {
+      "width": 1101,
+      "scrollWidth": 1101,
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 250,
+        "height": 1000
+      },
+      "topbar": {
+        "x": 250,
+        "y": 0,
+        "width": 851,
+        "height": 85
+      },
+      "calendar": {
+        "x": 250,
+        "y": 85,
+        "width": 551,
+        "height": 915
+      },
+      "filter": {
+        "x": 801,
+        "y": 85,
+        "width": 300,
+        "height": 915
+      },
+      "mini": {
+        "x": 818,
+        "y": 149,
+        "width": 267,
+        "height": 234
+      },
+      "toolbar": {
+        "x": 250,
+        "y": 85,
+        "width": 551,
+        "height": 106.390625
+      }
+    },
+    {
+      "width": 1100,
+      "scrollWidth": 1100,
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 250,
+        "height": 1000
+      },
+      "topbar": {
+        "x": 250,
+        "y": 0,
+        "width": 850,
+        "height": 85
+      },
+      "calendar": {
+        "x": 250,
+        "y": 85,
+        "width": 550,
+        "height": 915
+      },
+      "filter": {
+        "x": 800,
+        "y": 85,
+        "width": 300,
+        "height": 915
+      },
+      "mini": {
+        "x": 817,
+        "y": 149,
+        "width": 267,
+        "height": 234
+      },
+      "toolbar": {
+        "x": 250,
+        "y": 85,
+        "width": 550,
+        "height": 100
+      }
+    },
+    {
+      "width": 900,
+      "scrollWidth": 900,
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 250,
+        "height": 1000
+      },
+      "topbar": {
+        "x": 250,
+        "y": 0,
+        "width": 650,
+        "height": 85
+      },
+      "calendar": {
+        "x": 250,
+        "y": 85,
+        "width": 350,
+        "height": 915
+      },
+      "filter": {
+        "x": 600,
+        "y": 85,
+        "width": 300,
+        "height": 915
+      },
+      "mini": {
+        "x": 617,
+        "y": 149,
+        "width": 267,
+        "height": 234
+      },
+      "toolbar": {
+        "x": 250,
+        "y": 85,
+        "width": 350,
+        "height": 100
+      }
+    },
+    {
+      "width": 769,
+      "scrollWidth": 769,
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 250,
+        "height": 1000
+      },
+      "topbar": {
+        "x": 250,
+        "y": 0,
+        "width": 519,
+        "height": 85
+      },
+      "calendar": {
+        "x": 250,
+        "y": 85,
+        "width": 219,
+        "height": 915
+      },
+      "filter": {
+        "x": 469,
+        "y": 85,
+        "width": 300,
+        "height": 915
+      },
+      "mini": {
+        "x": 486,
+        "y": 149,
+        "width": 267,
+        "height": 234
+      },
+      "toolbar": {
+        "x": 250,
+        "y": 85,
+        "width": 219,
+        "height": 162
+      }
+    },
+    {
+      "width": 768,
+      "scrollWidth": 768,
+      "sidebar": {
+        "x": -280,
+        "y": 0,
+        "width": 280,
+        "height": 844
+      },
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "width": 768,
+        "height": 60
+      },
+      "calendar": {
+        "x": 0,
+        "y": 60,
+        "width": 768,
+        "height": 784
+      },
+      "filter": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      },
+      "mini": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      },
+      "toolbar": {
+        "x": 0,
+        "y": 60,
+        "width": 768,
+        "height": 104
+      }
+    },
+    {
+      "width": 481,
+      "scrollWidth": 481,
+      "sidebar": {
+        "x": -280,
+        "y": 0,
+        "width": 280,
+        "height": 844
+      },
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "width": 481,
+        "height": 60
+      },
+      "calendar": {
+        "x": 0,
+        "y": 60,
+        "width": 481,
+        "height": 784
+      },
+      "filter": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      },
+      "mini": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      },
+      "toolbar": {
+        "x": 0,
+        "y": 60,
+        "width": 481,
+        "height": 104
+      }
+    },
+    {
+      "width": 480,
+      "scrollWidth": 480,
+      "sidebar": {
+        "x": -280,
+        "y": 0,
+        "width": 280,
+        "height": 844
+      },
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "width": 480,
+        "height": 60
+      },
+      "calendar": {
+        "x": 0,
+        "y": 60,
+        "width": 480,
+        "height": 784
+      },
+      "filter": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      },
+      "mini": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      },
+      "toolbar": {
+        "x": 0,
+        "y": 60,
+        "width": 480,
+        "height": 104
+      }
+    },
+    {
+      "width": 390,
+      "scrollWidth": 390,
+      "sidebar": {
+        "x": -280,
+        "y": 0,
+        "width": 280,
+        "height": 844
+      },
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 60
+      },
+      "calendar": {
+        "x": 0,
+        "y": 60,
+        "width": 390,
+        "height": 784
+      },
+      "filter": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      },
+      "mini": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      },
+      "toolbar": {
+        "x": 0,
+        "y": 60,
+        "width": 390,
+        "height": 104
+      }
+    }
+  ],
+  "errors": [],
+  "isolation": "Disposable SQLite; explicit AMS_DATA_DIR; no production writes",
+  "timezone": "America/Los_Angeles + Asia/Taipei"
+}

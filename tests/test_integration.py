@@ -11,6 +11,7 @@ from pathlib import Path
 
 TEST_DATA=tempfile.TemporaryDirectory(prefix='polimax-contract-')
 os.environ['PREVIEW_DATA_DIR']=TEST_DATA.name
+os.environ['AMS_DATA_DIR']=TEST_DATA.name
 os.environ['AMS_DATABASE_MODE']='demo'
 os.environ.pop('PREVIEW_DATABASE_URL',None)
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'backend'))
@@ -89,6 +90,11 @@ class Contracts(unittest.TestCase):
         b=self.body();b['content']['slots']*=2;self.post('/api/bookings',b,409)
         b=self.body();b['content']['slots'][0]['end']=b['content']['slots'][0]['start'];self.create(b)
         b=self.body();b['content']['slots'][0]['end']=a.iso(self.day);self.post('/api/bookings',b,422)
+    def test_detail_links(self):
+        for value in (-1,1,0.5,'bad',True):
+            b=self.body();b['content']['slots'][0]['detail_index']=value;self.post('/api/bookings',b,422)
+        b=self.body();b['content']['slots'][0]['detail_index']='0'
+        saved=self.create(b);self.assertEqual(saved['content']['slots'][0]['detail_index'],0)
     def test_versions_delete_release(self):
         body=self.body();f=self.create(body)
         edited=self.put('/api/bookings/'+f['id'],{**body,'revision':f['revision']})
@@ -162,6 +168,12 @@ class Contracts(unittest.TestCase):
         headers={**HEADERS,'X-File-Name':'note.txt','Content-Type':'text/plain'}
         upload=self.client.post('/api/files',content=b'persisted attachment',headers=headers);self.assertEqual(upload.status_code,200)
         file=upload.json();self.assertEqual(self.client.get('/api/files/'+file['id']).content,b'persisted attachment')
+        for mime, inline in [('application/pdf', True), ('text/html', False)]:
+            item=self.client.post('/api/files',content=b'preview contract',headers={**HEADERS,'X-File-Name':'preview-file','Content-Type':mime}).json()
+            preview=self.client.get('/api/files/'+item['id']+'?preview=true')
+            self.assertEqual(preview.status_code,200)
+            self.assertTrue(preview.headers['content-disposition'].startswith('inline' if inline else 'attachment'))
+            self.assertEqual(preview.headers['content-type'].split(';')[0],mime if inline else 'application/octet-stream')
         for category,data in [('insurance',{'company':'測試','expiry':'2026-09-10','policy_files':[file],'claim_files':[file]}),('cost',{'type':'保養','reason':'測試','amount':10,'attachments':[file]}),('maintenance',{'type':'驗車','date':'2026-09-10'}),('garage',{'notes':'廠商'}),('manager',{'name':'測試管理人'})]:
             r=self.post(f'/api/resources/{self.car["id"]}/records',{'category':category,'data':data})
             self.put('/api/records/'+str(r['id']),{'category':category,'data':{**data,'notes':'修訂'}})

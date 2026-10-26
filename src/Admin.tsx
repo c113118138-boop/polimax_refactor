@@ -1,3 +1,5 @@
+import "./parity.css";
+import { Pencil, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, dateTime, invalidate, Resource } from "./api";
@@ -88,13 +90,12 @@ export function Beacons() {
           <Loading />
         ) : (
           <div className="table-scroll">
-            <table>
+            <table className="source-data-table">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>major</th>
-                  <th>名稱／擁有者</th>
-                  <th>已燒錄</th>
+                  <th>編號</th>
+                  <th>可視化</th>
+                  <th>擁有者</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -102,27 +103,28 @@ export function Beacons() {
                 {rows.map((b) => (
                   <tr key={b.id}>
                     <td>{b.id}</td>
-                    <td>{b.major}</td>
+                    <td>{b.programmed === "y" ? "true" : "false"}</td>
                     <td>{b.owner}</td>
-                    <td>{b.programmed === "y" ? "是" : "否"}</td>
                     <td>
                       {can(u, "BeaconList", "write") && (
                         <button
-                          className="button compact"
+                          className="icon-button"
+                          aria-label="編輯"
                           onClick={() => {
                             setOriginal(b.id);
                             setEdit({ ...b });
                           }}
                         >
-                          編輯
+                          <Pencil size={19} />
                         </button>
                       )}
                       {can(u, "BeaconList", "delete") && (
                         <button
-                          className="button compact"
+                          className="icon-button danger"
+                          aria-label="刪除"
                           onClick={() => setRemove(b)}
                         >
-                          刪除
+                          <Trash2 size={19} />
                         </button>
                       )}
                     </td>
@@ -148,22 +150,22 @@ export function Beacons() {
                 onChange={(e) => setEdit({ ...edit, id: e.target.value })}
               />
             </Field>
-            <Field label="名稱／擁有者" required>
+            <Field label="擁有者" required>
               <input
                 required
                 value={edit.owner}
                 onChange={(e) => setEdit({ ...edit, owner: e.target.value })}
               />
             </Field>
-            <Field label="已燒錄">
+            <Field label="可視化">
               <select
                 value={edit.programmed}
                 onChange={(e) =>
                   setEdit({ ...edit, programmed: e.target.value })
                 }
               >
-                <option value="n">否</option>
-                <option value="y">是</option>
+                <option value="n">False</option>
+                <option value="y">True</option>
               </select>
             </Field>
             <Field label="關聯設備">

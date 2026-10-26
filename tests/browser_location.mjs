@@ -61,7 +61,7 @@ try {
   );
   await page.goto(base);
   await page.getByRole("button", { name: /進入工作空間/ }).click();
-  await page.getByText("每一段行程，都安排妥當。").waitFor();
+  await page.locator(".calendar-page").waitFor();
   const resources = await (
     await context.request.get(base + "/api/resources")
   ).json();
@@ -95,16 +95,11 @@ try {
         ];
       else if (url.pathname.startsWith("/api/trajectory/"))
         body = {
-          points: [
-            point(),
-            { ...point(), lat: null, lng: null },
-            point(),
-          ],
+          points: [point(), { ...point(), lat: null, lng: null }, point()],
           count: 3,
           total: 3,
         };
-      else
-        body = { beacon, points: [] };
+      else body = { beacon, points: [] };
       await route.fulfill({ json: body });
     });
   }
@@ -113,12 +108,17 @@ try {
   await page.getByText("25.10000, 121.10000", { exact: true }).waitFor();
   assert.equal(await page.getByLabel("座標來源").count(), 0);
   await Promise.all([
-    page.waitForResponse((response) => new URL(response.url()).pathname === "/api/positions"),
+    page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/positions",
+    ),
     page.getByRole("button", { name: "刷新位置", exact: true }).click(),
   ]);
   assert(calls.filter((call) => call === "/api/positions").length >= 2);
-  await page.getByRole("button", { name: "車輛歷史軌跡", exact: true }).click();
-  await page.getByRole("button", { name: "查詢軌跡", exact: true }).click();
+  await page.goto(base + "/positions?view=history");
+  await page
+    .getByLabel("選擇車輛", { exact: true })
+    .selectOption(String(car.id));
+  await page.getByRole("button", { name: "查詢", exact: true }).click();
   await page
     .getByText("1 筆記錄無座標，未顯示於地圖。", { exact: true })
     .waitFor();

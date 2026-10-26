@@ -1,0 +1,147 @@
+{
+  "passes": [
+    "原 CarList / EquipmentList 欄序與操作表格",
+    "儀器新增、配件數量、三類文件真實 API 保存／刷新回讀與原資訊卡布局",
+    "多附件選擇、圖片／PDF 頁內預覽、inline 契約及缺檔錯誤可關閉",
+    "車輛五分頁、保險／成本原表格與新增、保養／檔案／人員同頁真實保存",
+    "歷史 11 欄、多占用合併、實際四階段總里程、主表與雙階段唯讀彈窗",
+    "B/C 分頁、原五欄與動態篩選、彈窗修訂實際保存、狀態不倒退、深層刷新",
+    "D 原編輯彈窗保存與回到原查詢位置",
+    "四定位頁分開布局、原 350px 側欄、769/768 斷點、手機 90vw 抽屜、點位與掃描狀態映射",
+    "Beacon 原四欄及資產／歷史／階段手機無頁面橫向溢出",
+    "借用人可修訂自己的 B，其他申請人的 B 不顯示編輯，日期保留台北分鐘",
+    "唯讀身分保留查詢、移除新增／編輯／刪除操作"
+  ],
+  "geometry": [
+    {
+      "name": "Positions",
+      "width": 1440,
+      "overflow": 0,
+      "sideWidth": 350,
+      "sideDisplay": "block",
+      "rightWidth": 840
+    },
+    {
+      "name": "Positions",
+      "width": 769,
+      "overflow": 0,
+      "sideWidth": 350,
+      "sideDisplay": "block",
+      "rightWidth": 169
+    },
+    {
+      "name": "Positions",
+      "width": 768,
+      "overflow": 0,
+      "sideWidth": 0,
+      "sideDisplay": "none",
+      "rightWidth": 768
+    },
+    {
+      "name": "Positions",
+      "width": 390,
+      "overflow": 0,
+      "sideWidth": 0,
+      "sideDisplay": "none",
+      "rightWidth": 390
+    },
+    {
+      "name": "Trajectory",
+      "width": 1440,
+      "overflow": 0,
+      "sideWidth": 350,
+      "sideDisplay": "block",
+      "rightWidth": 840
+    },
+    {
+      "name": "Trajectory",
+      "width": 769,
+      "overflow": 0,
+      "sideWidth": 350,
+      "sideDisplay": "block",
+      "rightWidth": 169
+    },
+    {
+      "name": "Trajectory",
+      "width": 768,
+      "overflow": 0,
+      "sideWidth": 0,
+      "sideDisplay": "none",
+      "rightWidth": 768
+    },
+    {
+      "name": "Trajectory",
+      "width": 390,
+      "overflow": 0,
+      "sideWidth": 0,
+      "sideDisplay": "none",
+      "rightWidth": 390
+    },
+    {
+      "name": "FindMy",
+      "width": 1440,
+      "overflow": 0,
+      "sideWidth": 350,
+      "sideDisplay": "block",
+      "rightWidth": 840
+    },
+    {
+      "name": "FindMy",
+      "width": 769,
+      "overflow": 0,
+      "sideWidth": 350,
+      "sideDisplay": "block",
+      "rightWidth": 169
+    },
+    {
+      "name": "FindMy",
+      "width": 768,
+      "overflow": 0,
+      "sideWidth": 0,
+      "sideDisplay": "none",
+      "rightWidth": 768
+    },
+    {
+      "name": "FindMy",
+      "width": 390,
+      "overflow": 0,
+      "sideWidth": 0,
+      "sideDisplay": "none",
+      "rightWidth": 390
+    },
+    {
+      "name": "Scans",
+      "width": 1440,
+      "overflow": 0,
+      "sideWidth": 350,
+      "sideDisplay": "block",
+      "rightWidth": 840
+    },
+    {
+      "name": "Scans",
+      "width": 769,
+      "overflow": 0,
+      "sideWidth": 350,
+      "sideDisplay": "block",
+      "rightWidth": 169
+    },
+    {
+      "name": "Scans",
+      "width": 768,
+      "overflow": 0,
+      "sideWidth": 0,
+      "sideDisplay": "none",
+      "rightWidth": 768
+    },
+    {
+      "name": "Scans",
+      "width": 390,
+      "overflow": 0,
+      "sideWidth": 0,
+      "sideDisplay": "none",
+      "rightWidth": 390
+    }
+  ],
+  "errors": [],
+  "isolation": "Disposable SQLite/uploads on 18030; location fixtures explicitly mocked; no production writes/restarts"
+}

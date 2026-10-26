@@ -1,0 +1,194 @@
+{
+  "passes": [
+    "來源群組順序、初始收合、原位展開與其他群組独立狀態",
+    "車輛／設備巢狀展開、API順序與刪除旗標，中間選單捲動且品牌／底部固定",
+    "A/D/E新增與分類查詢、資產詳情／刷新／新增重開、即時與軌跡模式、料件連結及取消登出",
+    "1440/900/769/768/390比例與無橫溢出、桌面收合、手機焦點循環／Esc／遮罩／選項關閉",
+    "唯讀使用者無借用／資產新增入口，管理／封存條件及直接URL新增權限保留",
+    "空清單與API失敗保留可辨識狀態及重試入口"
+  ],
+  "geometry": [
+    {
+      "width": 1440,
+      "logo": {
+        "x": 0,
+        "y": 0,
+        "width": 249,
+        "height": 80
+      },
+      "profile": {
+        "x": 8,
+        "y": 88,
+        "width": 233,
+        "height": 140
+      },
+      "actions": {
+        "x": 0,
+        "y": 719,
+        "width": 249,
+        "height": 125
+      },
+      "menu": {
+        "x": 0,
+        "y": 240,
+        "width": 249,
+        "height": 479
+      },
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 250,
+        "height": 844
+      },
+      "scrollHeight": 479,
+      "sideScroll": 0,
+      "overflow": 0
+    },
+    {
+      "width": 900,
+      "logo": {
+        "x": 0,
+        "y": 0,
+        "width": 249,
+        "height": 80
+      },
+      "profile": {
+        "x": 8,
+        "y": 88,
+        "width": 233,
+        "height": 140
+      },
+      "actions": {
+        "x": 0,
+        "y": 719,
+        "width": 249,
+        "height": 125
+      },
+      "menu": {
+        "x": 0,
+        "y": 240,
+        "width": 249,
+        "height": 479
+      },
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 250,
+        "height": 844
+      },
+      "scrollHeight": 479,
+      "sideScroll": 0,
+      "overflow": 0
+    },
+    {
+      "width": 769,
+      "logo": {
+        "x": 0,
+        "y": 0,
+        "width": 249,
+        "height": 80
+      },
+      "profile": {
+        "x": 8,
+        "y": 88,
+        "width": 233,
+        "height": 140
+      },
+      "actions": {
+        "x": 0,
+        "y": 719,
+        "width": 249,
+        "height": 125
+      },
+      "menu": {
+        "x": 0,
+        "y": 240,
+        "width": 249,
+        "height": 479
+      },
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 250,
+        "height": 844
+      },
+      "scrollHeight": 479,
+      "sideScroll": 0,
+      "overflow": 0
+    },
+    {
+      "width": 768,
+      "logo": {
+        "x": 0,
+        "y": 50,
+        "width": 279,
+        "height": 60
+      },
+      "profile": {
+        "x": 8,
+        "y": 118,
+        "width": 263,
+        "height": 140
+      },
+      "actions": {
+        "x": 0,
+        "y": 759,
+        "width": 279,
+        "height": 85
+      },
+      "menu": {
+        "x": 0,
+        "y": 270,
+        "width": 279,
+        "height": 489
+      },
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 280,
+        "height": 844
+      },
+      "scrollHeight": 489,
+      "sideScroll": 0,
+      "overflow": 0
+    },
+    {
+      "width": 390,
+      "logo": {
+        "x": -260.0367431640625,
+        "y": 50,
+        "width": 279,
+        "height": 60
+      },
+      "profile": {
+        "x": -252.0367431640625,
+        "y": 118,
+        "width": 263,
+        "height": 140
+      },
+      "actions": {
+        "x": -260.0367431640625,
+        "y": 759,
+        "width": 279,
+        "height": 85
+      },
+      "menu": {
+        "x": -260.0367431640625,
+        "y": 270,
+        "width": 279,
+        "height": 489
+      },
+      "sidebar": {
+        "x": -260.0367431640625,
+        "y": 0,
+        "width": 280,
+        "height": 844
+      },
+      "scrollHeight": 489,
+      "sideScroll": 0,
+      "overflow": 0
+    }
+  ],
+  "errors": [],
+  "isolation": "Disposable SQLite; browser-only scroll/delete/empty/error fixtures; no production changes"
+}

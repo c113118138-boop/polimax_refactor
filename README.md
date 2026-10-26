@@ -1,8 +1,24 @@
 # polimax_refactor / AMS 交接手冊
 
+2026-10-12新增 [POLIMAX_SYSTEM_SPEC.md](POLIMAX_SYSTEM_SPEC.md)：以功能、畫面、API及驗收為準的獨立實作規格，預設PostgreSQL；語言、框架、內部架構及資料表設計由重建AI決定。含完整欄位、布局、操作、權限、請求／回應、部署責任與待確認事項，沒有專案壓縮包或解壓成品流程。
+
+原 [POLIMAX_REBUILD_SPEC.md](POLIMAX_REBUILD_SPEC.md) 仍保留，是2026-10-12套用Logo後的實作快照與還原文件；重新設計內部實作時，以新的功能／畫面／API規格為準，不要求照搬快照中的程式。
+
+2026-10-11 原站其餘畫面補齊：歷史／B/C查詢、自製查看編輯彈窗、原資產清單／五分頁／資訊卡、保險／成本／維護／檔案／人員、附件預覽及定位四頁。布局見 [SITE_PARITY_LAYOUT_SPEC](docs/reconstruction/SITE_PARITY_LAYOUT_SPEC.md)，截圖與測試見 [SITE_PARITY_ACCEPTANCE](docs/reconstruction/SITE_PARITY_ACCEPTANCE.md)，本輪後端部署及儀器文件備份見 [SITE_PARITY_PREVIEW](deploy/SITE_PARITY_PREVIEW.md)。`npm run preview:main`提供18024隔離預覽；先前修改保留。
+
+2026-10-10 主畫面重建：日曆、右側小日曆／車牌篩選、手機抽屜及共用框架已依來源布局整理。ABCDE表單已接續重建，含B/C出發及抵達。布局與未知項目見 [LAYOUT_SPEC](docs/reconstruction/LAYOUT_SPEC.md)，畫面／測試見 [主畫面驗收](docs/reconstruction/MAIN_SCREEN_ACCEPTANCE.md)，隔離可操作預覽與部署補充見 [MAIN_SCREEN_PREVIEW](deploy/MAIN_SCREEN_PREVIEW.md)。`npm run build` 後以 `npm run preview:main` 開啟獨立示範資料預覽（18024），不取代正式SSO入口。
+
 > 專案名稱與路徑更新：2026-10-07。專案名稱為 `polimax_refactor`，本機目錄為 `/home/c113118138/polimax_refactor`。
 
 更新：2026-10-05。現行正式系統使用 PostgreSQL／PostGIS；MySQL 已不再用於本專案正式服務。程式尚留的 MySQL 驅動、分支與測試屬相容工具，不是部署必要服務。
+
+表單布局、畫面證據與預覽見 [FORM_LAYOUT_SPEC](docs/reconstruction/FORM_LAYOUT_SPEC.md)、[FORM_ACCEPTANCE](docs/reconstruction/FORM_ACCEPTANCE.md)、[FORMS_PREVIEW](deploy/FORMS_PREVIEW.md)。`npm run preview:forms` 使用獨立示範資料（18025）。
+
+側欄已接續重建來源群組、車輛／設備巢狀清單與固定底部。規格見 [SIDEBAR_LAYOUT_SPEC](docs/reconstruction/SIDEBAR_LAYOUT_SPEC.md)，截圖及驗證見 [SIDEBAR_ACCEPTANCE](docs/reconstruction/SIDEBAR_ACCEPTANCE.md)；`npm run test:sidebar`可重跑隔離驗證。
+
+接續補上 ABCDE 未保存離頁／關閉／登出保護，以及側欄各入口的 read 權限和空群組隱藏。操作規則、截圖、測試邊界見 [NAVIGATION_SAFETY_ACCEPTANCE](docs/reconstruction/NAVIGATION_SAFETY_ACCEPTANCE.md)；`npm run test:navigation`使用18028一次性隔離資料驗證。
+
+車輛／作業區使用查詢接續改為來源11／8欄表格、多時段合併與原區塊順序。規格見 [QUERY_LAYOUT_SPEC](docs/reconstruction/QUERY_LAYOUT_SPEC.md)，驗證／截圖見 [QUERY_ACCEPTANCE](docs/reconstruction/QUERY_ACCEPTANCE.md)，預覽及部署見 [QUERIES_PREVIEW](deploy/QUERIES_PREVIEW.md)；`npm run test:queries`使用18029一次性隔離資料。
 
 ## 1. 架構與閱讀入口
 
@@ -24,7 +40,7 @@ FindMy 匯入器、外部 MQTT 接收器 → PostgreSQL
 | [完整規格](PROJECT_SPEC.md) | 工具版本、前端路由、全部 API、資料與業務規則 |
 | [部署手冊](deploy/README.md) | 安裝、設定、啟動與發版 |
 | [搬機清單](deploy/STANDALONE.md) | 資料庫、持久資料、外部接收器與登入依賴 |
-| [主要時序](SEQUENCE_DIAGRAMS.md)、[逐步操作](USER_JOURNEY_SEQUENCE.md) | 登入、預約、車輛、附件、定位與封存流程 |
+| [主要時序](SEQUENCE_DIAGRAMS.md)、[逐步操作](SYSTEM_MAINTENANCE_GUIDE.md#flows) | 登入、預約、車輛、附件、定位與封存流程 |
 | [驗收說明](ACCEPTANCE.md) | 現行驗收項目與既有測試紀錄的範圍 |
 | [功能與欄位需求](../POLIMAX_原始_SPEC.md) | 業務欄位及現行架構對照，含原表單相容附錄 |
 
@@ -132,7 +148,7 @@ retention測試需要PG16及PostGIS，在臨時叢集驗證。demo/API/Playwrigh
 
 - [GPS保存與查詢](deploy/GPS_RETENTION.md)、[歷史封存](deploy/ARCHIVE_RETENTION.md)、[PostGIS](deploy/POSTGIS.md)。
 - [FindMy部署](deploy/FINDMY_POSTGRESQL.md)、[定位效能](scripts/LOCATION_BENCHMARK.md)。
-- [資料庫架構與遷移紀錄](POSTGRESQL_MIGRATION_BASELINE.md)、[PostgreSQL搬移與回復](POSTGRESQL_CUTOVER_RUNBOOK.md)。
+- [系統流程與維運手冊](SYSTEM_MAINTENANCE_GUIDE.md)：架構與資料庫基準、逐步流程、搬移回復及歷史紀錄。
 
 ## 專案改名與相容名稱
 

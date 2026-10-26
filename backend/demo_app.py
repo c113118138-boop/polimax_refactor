@@ -154,7 +154,9 @@ def public_payload(payload): return {k:v for k,v in json.loads(payload).items() 
 def resource_json(r): return {**public_payload(r.payload),'id':r.id,'kind':r.kind,'label':r.label}
 def form_json(f, db):
     slots = db.scalars(select(Occupancy).where(Occupancy.form_id==f.id,Occupancy.active==1).order_by(Occupancy.id)).all()
+    parent = db.get(Form, f.parent_id) if f.kind in ('B', 'C') and f.parent_id else None
     return {'id':f.id,'kind':f.kind,'owner':f.owner,'content':public_payload(f.payload),'status':f.status,
+            **({'applicant_owner': parent.owner if parent else ''} if f.kind in ('B', 'C') else {}),
             'contact_person':','.join(json.loads(f.payload).get('employees',[])) or json.loads(f.payload).get('applicant',''),'revision':f.revision,'parent_id':f.parent_id,'previous_id':f.previous_id,
             'created_at':iso(f.created_at),'updated_at':iso(f.updated_at),
             'slots':[{'resource_id':s.resource_id,'start':iso(s.start),'end':iso(s.end)} for s in slots]}
@@ -216,7 +218,7 @@ async def security(request:Request,call_next):
         try:
             if request.method not in ('GET','HEAD','OPTIONS') and request.headers.get('x-ams-client')!='preview':
                 fail('缺少有效的操作來源標記',403)
-            if request.url.path.startswith('/api/') and request.url.path not in ('/api/health','/api/auth/login','/api/auth/logout'):
+            if request.url.path.startswith('/api/') and request.url.path not in ('/api/health','/api/auth/config','/api/auth/login','/api/auth/logout'):
                 u = await run_in_threadpool(user,request,db)
                 await permissions.authorize(request,db,u)
             response=await call_next(request)
@@ -326,6 +328,7 @@ class BookingInput(BaseModel):
     content:dict
     revision:int|None=None
 def validate_booking(db,body,exclude=None):
+    from form_validation import detail_links
     if body.kind not in ('A','D','E'):fail('無效的預約類型')
     body.content = {k:v for k,v in body.content.items() if not k.startswith('_')}
     c=body.content
@@ -353,6 +356,7 @@ def validate_booking(db,body,exclude=None):
     if '其他加工' in c.get('purposes',[]) and not c.get('other_processing','').strip():fail('請填寫其他加工說明')
     slots=c.get('slots',[])
     if not slots:fail('請新增至少一個資源與時段')
+    detail_links(c,body.kind)
     normalized=[]
     try: ids=sorted(set(int(s['resource_id']) for s in slots))
     except (ValueError,KeyError,TypeError):fail('請選擇有效資源')
@@ -506,7 +510,7 @@ async def upload(request:Request,u=Depends(writer),db=Depends(getdb)):
 def download(id:str,preview:bool=False,u=Depends(user),db=Depends(getdb)):
     a=db.get(Attachment,id)
     if not a or not (DATA/a.id).exists():fail('找不到附件',404)
-    safe=a.mime in ('image/jpeg','image/png','image/webp','image/gif')
+    safe=a.mime in ('image/jpeg','image/png','image/webp','image/gif','application/pdf')
     return FileResponse(DATA/a.id,filename=a.name,media_type=a.mime if safe else 'application/octet-stream',content_disposition_type='inline' if preview and safe else 'attachment')
 
 # Feature modules share the same request transaction and stable resource identifiers.

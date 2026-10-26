@@ -1,0 +1,81 @@
+{
+  "date": "2026-10-12",
+  "source_document": "POLIMAX_REBUILD_SPEC.md",
+  "restored_directory": "/tmp/polimax-spec-check-ahos_vgh/project",
+  "restored_files": 120,
+  "snapshot_files_equal_current_source": 110,
+  "bundle_sha256": "7962ec1fa06c4b990fc70821838a1709ec61713717d0a749afe60103ce8ee9a3",
+  "logo_sha256": "cf12e08949670143d60bfc790a38003e6b1dc02b9d92ae167092248784d5d64c",
+  "schema_tables": 25,
+  "schema_contains_business_rows": false,
+  "existing_directory_overwrite_refused": true,
+  "private_runtime_data_excluded": true,
+  "dependencies_for_local_validation": "Reused installed node_modules and .venv; all source and assets restored from the Markdown.",
+  "build": "passed",
+  "compiled_artifacts": [
+    {
+      "path": "dist/index.html",
+      "sha256": "ef23f04c8f317ff0d408982e7a6afd5a6651846dca6b68a36ab6d0dae22982f2",
+      "identical": true
+    },
+    {
+      "path": "dist/assets/index-a_98kUSf.css",
+      "sha256": "b085c76055e6a4b5b1e527b42ea35f64246a4e084eae80ae61512b0da905f1b0",
+      "identical": true
+    },
+    {
+      "path": "dist/assets/index-BPxzTFfM.js",
+      "sha256": "7febe5a487e53920eab789c38f684eff1b02cf8392746274f9a464299cf7ecb0",
+      "identical": true
+    },
+    {
+      "path": "dist/Logo.jpg",
+      "sha256": "cf12e08949670143d60bfc790a38003e6b1dc02b9d92ae167092248784d5d64c",
+      "identical": true
+    }
+  ],
+  "preview": {
+    "port": 18031,
+    "login": "passed",
+    "deep_route_refresh": "passed",
+    "removed_sidebar_entries_absent": true,
+    "admin_links": [
+      "BeaconList",
+      "CarList",
+      "EquipmentList"
+    ],
+    "logo": [
+      {
+        "viewport": 1440,
+        "naturalWidth": 236,
+        "naturalHeight": 100,
+        "width": 220,
+        "height": 55.109375,
+        "fit": "cover"
+      },
+      {
+        "viewport": 390,
+        "naturalWidth": 236,
+        "naturalHeight": 100,
+        "width": 160,
+        "height": 40.078125,
+        "fit": "cover"
+      }
+    ],
+    "pageerrors": []
+  },
+  "query_verification": {
+    "passed_groups": 9,
+    "passes": [
+      "A來源11欄、多時段3欄合併、表單數量、車牌／需求映射與台北完整秒數",
+      "A動態篩選、逐時段匹配／重新合併、日期含結束當日、狀態快選與清除／無結果",
+      "A列內下一階段取得最新revision、真實API保存發車與清單更新；編輯／軌跡深層入口",
+      "D來源8欄、表單／操作合併、時段數量、新增／查看／編輯保存回讀與刷新",
+      "E儀器表格、多時段合併、設備名稱／編碼／人員、無分類列、查看唯讀／編輯保存回讀與刷新",
+      "A/D/E 1440/900/769/768/390比例、20px內距、灰色表頭／欄寬／字級／框線、表內橫捲且頁面無溢出",
+      "唯讀／摘要／owner限制、指定車輛來源提示與返回、E及歷史查詢相容",
+      "A/D空資料、載入失敗與重試、刪除取消／失敗保留／真實刪除同步",
+      "E刪除確認及真實刪除同步；無車輛出回程操作"
+    ]
+  }
+}

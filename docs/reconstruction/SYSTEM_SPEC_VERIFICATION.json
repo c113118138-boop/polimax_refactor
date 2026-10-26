@@ -1,0 +1,28 @@
+{
+  "checked_at": "2026-10-12",
+  "scope": "Documentation integrity; no runtime code was changed or runtime tests rerun.",
+  "spec": "POLIMAX_SYSTEM_SPEC.md",
+  "spec_sha256": "f3a29af30a94ad5c2204f468863e058dafdfadcba0de5eccbf64d1078e627f41",
+  "old_spec_unchanged": true,
+  "old_spec_sha256": "33251ca80684eee1620eb5d8c2b6ebe9b59ecda4df395543013434ca4b052b55",
+  "numbered_chapters": 22,
+  "page_definitions": 25,
+  "unconfirmed_policies": 14,
+  "valid_json_blocks": 8,
+  "core_api_method_path_pairs": 43,
+  "core_api_coverage": "complete against formal route declarations",
+  "logo_bytes": 6483,
+  "logo_sha256": "cf12e08949670143d60bfc790a38003e6b1dc02b9d92ae167092248784d5d64c",
+  "logo_matches_current_asset": true,
+  "city_classifications": 24,
+  "district_entries": 367,
+  "options_match_current_data": true,
+  "balanced_markdown_fences": true,
+  "no_project_source_bundle": true,
+  "no_external_markdown_or_workspace_dependency": true,
+  "not_verified": [
+    "Independent AI implementation",
+    "Production SSO connectivity",
+    "Correctness of unconfirmed business policies"
+  ]
+}

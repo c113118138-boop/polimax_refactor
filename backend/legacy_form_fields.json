@@ -68,6 +68,7 @@
     "工案": "Case_ID_and_name",
     "材料送貨": "Material_Delivering_client",
     "新開發案": "New_develop_project_ID_and_Name",
+    "成交案回訪": "Case_ID_and_name2",
     "參展": "exhibit_name",
     "其他": "Others_comment"
   },

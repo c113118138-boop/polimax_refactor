@@ -27,6 +27,7 @@ const server = spawn(
     env: {
       ...process.env,
       PREVIEW_DATA_DIR: dir,
+      AMS_DATA_DIR: dir,
       AMS_DATABASE_MODE: "demo",
       PREVIEW_DATABASE_URL: "",
       PREVIEW_LOGIN_ENABLED: "1",
@@ -62,34 +63,34 @@ try {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(base);
   await page.getByRole("button", { name: /進入工作空間/ }).click();
-  await page.getByText("每一段行程，都安排妥當。").waitFor();
+  await page.locator(".calendar-page .fc-daygrid").waitFor();
   console.log("PASS login");
   if (!process.env.AMS_TEST_MOBILE) {
     await page.getByRole("button", { name: "收合側欄", exact: true }).click();
     assert.equal(await page.locator(".sidebar-collapsed").count(), 1);
     await page.getByRole("button", { name: "展開側欄", exact: true }).click();
   }
-  assert.equal(await page.getByText("時間顯示：臺北 UTC+8").count(), 1);
+  assert.equal(await page.locator(".calendar-page").count(), 1);
   const resources = await (
     await context.request.get(base + "/api/resources")
   ).json();
   const car = resources.find((r) => r.kind === "vehicle");
   await page.goto(base + "/bookings/new/A");
-  await page.locator('input[name="title"]').fill("瀏覽器完整流程測試");
-  await page.getByRole("button", { name: "下一步" }).click();
+  await page.locator('textarea[name="notes"]').fill("瀏覽器完整流程測試");
+  await page.getByRole("button", { name: "新增明細", exact: true }).click();
   await page.locator('input[name="details.0.name"]').fill("BROWSER-001");
   await page.locator('select[name="details.0.city"]').selectOption("新竹市");
   await page.locator('select[name="details.0.district"]').selectOption("東區");
-  await page.getByRole("button", { name: "下一步" }).click();
+  await page.getByRole("button", { name: "保存明細", exact: true }).click();
+  await page.getByRole("button", { name: "新增時段", exact: true }).click();
   await page
     .locator('select[name="slots.0.resource_id"]')
     .selectOption(String(car.id));
   await page.locator('input[name="slots.0.start"]').fill("2027-11-01T09:00:17");
   await page.locator('input[name="slots.0.end"]').fill("2027-11-01T10:00:33");
-  await page.getByRole("button", { name: "下一步" }).click();
-  await page.getByRole("button", { name: "下一步" }).click();
+  await page.getByRole("button", { name: "保存時段", exact: true }).click();
   assert.match(
-    await page.locator(".slot-summary").first().innerText(),
+    await page.locator('[data-grid="時段"] tbody').first().innerText(),
     /11\/01 09:00/,
   );
   await page.getByRole("button", { name: "確認送出", exact: true }).click();
@@ -122,7 +123,8 @@ try {
     await page.getByRole("button", { name: button, exact: true }).click();
     const dialog = page.getByRole("dialog");
     if (checks) {
-      await dialog.getByLabel(/^駕駛人員/).selectOption("林品安");
+      await dialog.getByLabel(/^駕駛人員/).fill("林品安");
+      await dialog.locator("select").first().selectOption(String(car.id));
       await dialog.getByLabel(/^(去程|回程)發車地點/).fill("測試廠區");
       for (const label of checks)
         await dialog.getByLabel(label, { exact: true }).check();
@@ -143,8 +145,8 @@ try {
         .getByRole("link", { name: "test-photo.png", exact: true })
         .waitFor();
     }
-    await dialog.locator("input[type=number]").fill(String(mileage));
-    await dialog.getByLabel("我已確認本階段里程").check();
+    await dialog.locator("input[type=number]:enabled").fill(String(mileage));
+    await dialog.locator("form").getByLabel("我已確認本階段里程").check();
     await dialog.getByRole("button", { name: "確認提交本階段" }).click();
     await dialog.waitFor({ state: "hidden" });
     console.log("PASS stage", button);
@@ -180,8 +182,15 @@ try {
     await page.goto(base + path);
     await page.locator(".page-heading").waitFor();
   }
+  if (process.env.AMS_TEST_MOBILE)
+    await page.locator(".source-map-menu").click();
   await page.getByLabel("定位設備", { exact: true }).selectOption("000b");
-  await page.getByText(/major 11/).waitFor();
+  if (process.env.AMS_TEST_MOBILE)
+    await page.locator(".source-map-menu").click();
+  await page
+    .locator(".source-location-details")
+    .filter({ hasText: /Major[\s\S]*11/ })
+    .waitFor();
   await mkdir(project + "test-results", { recursive: true });
   await page.screenshot({
     path:
@@ -206,14 +215,17 @@ try {
   assert.equal(
     await phone
       .locator("label")
-      .filter({ hasText: "測試假日" })
+      .filter({ hasText: "顯示節日" })
       .last()
       .isVisible(),
     false,
   );
   await phone.getByRole("button", { name: "開啟選單" }).click();
-  await phone.getByRole("link", { name: "公務車輛", exact: true }).click();
-  await phone.locator(".asset-grid").waitFor();
+  await phone
+    .getByRole("button", { name: "後台資訊管理", exact: true })
+    .click();
+  await phone.getByRole("link", { name: "CarList", exact: true }).click();
+  await phone.getByRole("table", { name: "CarList" }).waitFor();
   assert.equal(await phone.locator(".sidebar.is-open").count(), 0);
   assert.equal(
     await phone.getByRole("button", { name: "新增車輛", exact: true }).count(),
@@ -227,8 +239,11 @@ try {
     await mobile.request.get(base + "/api/bookings")
   ).json();
   assert(!JSON.stringify(viewerForms).includes("機密備註"));
-  await phone.goto(base + "/bookings/new/A");
-  await phone.getByRole("alert").waitFor();
+  for (const kind of ["A", "D", "E"]) {
+    await phone.goto(base + "/bookings/new/" + kind);
+    await phone.getByRole("alert").waitFor();
+    assert.equal(await phone.locator(".source-form").count(), 0);
+  }
   assert.deepEqual(errors, []);
   console.log(
     "PASS: desktop full A/B/C flow, seconds/timezone, stage correction, all module pages, Beacon major, mobile navigation and read-only permissions.",

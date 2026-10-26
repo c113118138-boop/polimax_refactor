@@ -137,4 +137,4 @@ backup_postgresql.py打包專案固定`.data/responses`、`.data/files`、`.data
 
 網站／封存／備份共用應用advisory lock；PMX與FindMy等外部寫入者不保證使用相同鎖，所以完整跨系統還原點要停所有寫入者。04:00備份timer沒有顯式時區，依主機時區執行；03:30清理timer則明定Asia/Taipei。停timer不會取消已在執行的oneshot，維護窗口另須確認作業結束。
 
-現行MySQL已不作正式資料庫；封存與雙庫備份僅PostgreSQL。操作順序見[回復手冊](../POSTGRESQL_CUTOVER_RUNBOOK.md)。本次文件更新未執行初始化、清理或還原。
+現行MySQL已不作正式資料庫；封存與雙庫備份僅PostgreSQL。操作順序見[回復手冊](../SYSTEM_MAINTENANCE_GUIDE.md#operations)。本次文件更新未執行初始化、清理或還原。

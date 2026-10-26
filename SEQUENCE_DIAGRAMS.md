@@ -4,7 +4,7 @@
 
 > 更新：2026-10-05。現行正式架構為 PostgreSQL／PostGIS + FastAPI + React + 公司 SSO。文件更新依程式與部署紀錄核對，未重新執行正式環境驗收。
 
-從登入頁開始的詳細流程，請見 [逐步時序圖](USER_JOURNEY_SEQUENCE.md)。
+從登入頁開始的詳細流程，請見 [逐步時序圖](SYSTEM_MAINTENANCE_GUIDE.md#flows)。
 
 依目前正式 PostgreSQL／SSO 模式的原始碼整理，不含隔離 demo 模式。箭頭代表請求或內部呼叫，虛線代表回應；圖中省略部分欄位與 UI 操作。所有受保護 API 都會驗證 session，並依端點檢查權限。
 
